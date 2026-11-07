@@ -1,0 +1,1665 @@
+<title>摊车订单</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@700&display=swap">
+<style>
+/* Layout: 一个页面四个画面，用网址后面的 #order / #kitchen / #admin 切换。点餐端单栏；出餐端和管理者是宽版，卡片网格，平板排多栏。 */
+:root {
+  --bg: #F2F4F1;
+  --surface: #FFFFFF;
+  --ink: #1C2A25;
+  --muted: #5C6B65;
+  --line: #D6DCD7;
+  --accent: #1F6F5C;
+  --on-accent: #FFFFFF;
+  --accent-soft: #DDEBE5;
+  --chili: #C0392B;
+  --on-chili: #FFFFFF;
+  --ice: #1F5F99;
+  --ice-soft: #DCE9F5;
+  --warn: #8A5200;
+  --warn-soft: #F8E8C8;
+  --bad: #A32A1F;
+  --scrim: rgba(18, 26, 22, 0.45);
+  --font-body: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-display: "Noto Serif SC", "Songti SC", "SimSun", serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121916;
+    --surface: #1B2521;
+    --ink: #E8EFEB;
+    --muted: #9AAAA3;
+    --line: #2D3A35;
+    --accent: #4FB596;
+    --on-accent: #0C1512;
+    --accent-soft: #1F3A31;
+    --chili: #E5604F;
+    --on-chili: #1A0B09;
+    --ice: #7FB4E8;
+    --ice-soft: #1D3047;
+    --warn: #E8B04F;
+    --warn-soft: #3A2E14;
+    --bad: #F08A7C;
+    --scrim: rgba(0, 0, 0, 0.6);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121916;
+  --surface: #1B2521;
+  --ink: #E8EFEB;
+  --muted: #9AAAA3;
+  --line: #2D3A35;
+  --accent: #4FB596;
+  --on-accent: #0C1512;
+  --accent-soft: #1F3A31;
+  --chili: #E5604F;
+  --on-chili: #1A0B09;
+  --ice: #7FB4E8;
+  --ice-soft: #1D3047;
+  --warn: #E8B04F;
+  --warn-soft: #3A2E14;
+  --bad: #F08A7C;
+  --scrim: rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  padding-block: 20px 120px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+button { font-family: inherit; font-size: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+button:focus-visible, a:focus-visible, .inp:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+a { color: inherit; }
+
+.wrap { margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+.w-narrow { max-width: 560px; }
+.w-wide { max-width: 960px; }
+.stack { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+
+header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.titles { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.brand { font-family: var(--font-display); font-size: 30px; line-height: 1.2; margin: 0; text-wrap: balance; }
+.sub { margin: 0; color: var(--muted); font-size: 14px; letter-spacing: 0.04em; }
+.back { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted); font-size: 14px; text-decoration: none; }
+.back:hover { text-decoration: underline; }
+.tools { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+.conn { display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px; border-radius: 99px; background: var(--surface); border: 1px solid var(--line); font-size: 13px; font-weight: 500; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+.conn[data-state="ok"] .dot { background: var(--accent); }
+.conn[data-state="wait"] .dot { background: var(--warn); }
+.conn[data-state="bad"] .dot { background: var(--bad); }
+
+.banner { margin: 0; padding: 12px 14px; border-radius: 12px; background: var(--warn-soft); color: var(--warn); font-size: 14px; font-weight: 500; }
+.editbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 14px; border-radius: 12px; background: var(--accent-soft); color: var(--accent); font-size: 14px; font-weight: 500; }
+
+/* 首页 */
+.home-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 12px; }
+.big { display: flex; flex-direction: column; justify-content: center; gap: 4px; min-height: 120px; padding: 18px 20px; border-radius: 16px; background: var(--surface); border: 1.5px solid var(--line); text-decoration: none; }
+.big strong { font-family: var(--font-display); font-size: 28px; line-height: 1.2; }
+.big span { font-size: 14px; color: var(--muted); }
+.big.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.big.primary span { color: var(--on-accent); opacity: 0.85; }
+.help { margin: 0; font-size: 14px; color: var(--muted); }
+
+/* 点餐端 */
+section { display: flex; flex-direction: column; gap: 12px; }
+h2 { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.14em; color: var(--muted); display: flex; align-items: center; gap: 12px; }
+h2::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.menu { display: flex; flex-direction: column; gap: 12px; }
+
+.item { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.item-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.item-head h3 { margin: 0; font-family: var(--font-display); font-size: 22px; line-height: 1.2; }
+.tag { font-size: 13px; font-weight: 500; padding: 2px 10px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); }
+.tag.sold-tag { background: var(--warn-soft); color: var(--warn); font-weight: 700; }
+.price { margin-left: auto; font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.opt { display: flex; flex-direction: column; gap: 6px; }
+.opt-label { font-size: 13px; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--bg); font-weight: 500; }
+.chip[aria-checked="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.chip.hot[aria-checked="true"] { background: var(--chili); border-color: var(--chili); color: var(--on-chili); }
+.item-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.stepper { display: flex; align-items: center; gap: 4px; }
+.step { width: 44px; height: 44px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--bg); font-size: 22px; line-height: 1; font-weight: 500; }
+.qty { min-width: 56px; text-align: center; font-weight: 700; font-size: 18px; font-variant-numeric: tabular-nums; }
+.qty small { font-weight: 400; font-size: 13px; color: var(--muted); margin-left: 2px; }
+.add { flex: 1; min-width: 140px; min-height: 48px; border-radius: 10px; border: 0; background: var(--ink); color: var(--bg); font-weight: 700; }
+.link-btn { align-self: flex-start; min-height: 40px; padding: 0 14px; border-radius: 10px; border: 1.5px dashed var(--line); background: transparent; color: var(--muted); font-weight: 500; font-size: 14px; }
+.item.sold .item-head h3, .item.sold .price, .item.sold .opt, .item.sold .item-foot { opacity: 0.45; }
+
+.bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; padding-top: 12px; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); background: var(--bg); border-top: 1px solid var(--line); }
+.bar-btn { display: flex; width: 100%; max-width: 560px; margin: 0 auto; min-height: 54px; align-items: center; justify-content: space-between; padding: 0 18px; border: 0; border-radius: 12px; background: var(--accent); color: var(--on-accent); font-weight: 700; font-size: 17px; }
+.badge { min-width: 32px; height: 32px; padding: 0 10px; border-radius: 99px; background: var(--on-accent); color: var(--accent); display: inline-flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums; }
+
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 30; max-width: calc(100% - 32px); display: flex; align-items: center; gap: 12px; padding: 10px 18px; border-radius: 16px; background: var(--ink); color: var(--bg); font-weight: 500; }
+.toast.high { bottom: calc(92px + env(safe-area-inset-bottom, 0px)); }
+.toast.has-undo { padding: 6px 6px 6px 18px; border-radius: 99px; }
+.undo { min-height: 44px; padding: 0 18px; border: 0; border-radius: 99px; background: var(--bg); color: var(--ink); font-weight: 700; }
+
+.sheet { position: fixed; inset: 0; z-index: 20; display: flex; align-items: flex-end; justify-content: center; }
+.scrim { position: absolute; inset: 0; background: var(--scrim); }
+.panel { position: relative; width: 100%; max-width: 560px; max-height: 88vh; overflow-y: auto; background: var(--surface); border-radius: 18px 18px 0 0; padding-top: 18px; padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px)); padding-left: max(18px, env(safe-area-inset-left, 0px)); padding-right: max(18px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 14px; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.panel-head h2 { font-size: 20px; letter-spacing: 0; color: var(--ink); font-family: var(--font-display); }
+.panel-head h2::after { display: none; }
+.close { min-width: 44px; min-height: 44px; border: 0; background: transparent; font-size: 15px; font-weight: 500; color: var(--muted); }
+.lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.line { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+.line:first-child { border-top: 0; }
+.line-main { flex: 1; min-width: 0; }
+.line-name { font-weight: 700; }
+.line-opts { font-size: 14px; color: var(--muted); }
+.soldmark { color: var(--bad); font-weight: 700; }
+.line .step { width: 40px; height: 40px; }
+.line .qty { min-width: 36px; }
+.line-price { min-width: 56px; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.total { margin: 0; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 16px; }
+.total b { font-family: var(--font-display); font-size: 28px; font-variant-numeric: tabular-nums; }
+.send { width: 100%; min-height: 54px; border: 0; border-radius: 12px; background: var(--accent); color: var(--on-accent); font-weight: 700; font-size: 17px; }
+.ghost { min-height: 48px; padding: 0 16px; border-radius: 12px; border: 1.5px solid var(--line); background: transparent; font-weight: 500; }
+.btn-sm { min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1.5px solid var(--line); background: transparent; font-weight: 500; }
+.btn-danger { border-color: var(--bad); color: var(--bad); }
+.empty-s { margin: 0; color: var(--muted); }
+.err { margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--warn-soft); color: var(--bad); font-size: 14px; font-weight: 500; }
+.done-box { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; padding: 6px 0; }
+.done-label { margin: 0; color: var(--muted); font-size: 14px; letter-spacing: 0.1em; }
+.done-no { margin: 0; font-family: var(--font-display); font-size: 72px; line-height: 1.1; font-variant-numeric: tabular-nums; color: var(--accent); }
+.note { margin: 0; font-size: 13px; color: var(--muted); }
+
+/* 已点订单列表 */
+.ord { display: flex; flex-direction: column; gap: 8px; padding: 14px 0; border-top: 1px solid var(--line); }
+.ord:first-child { border-top: 0; }
+.ord-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.ord-no { font-family: var(--font-display); font-size: 26px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.ord-time { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+.st { margin-left: auto; font-size: 13px; font-weight: 700; padding: 2px 10px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); }
+.st.done { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+.st.cancel { background: var(--warn-soft); color: var(--warn); }
+.ord-lines { list-style: none; margin: 0; padding: 0; font-size: 15px; }
+.ord.cancelled .ord-lines { text-decoration: line-through; color: var(--muted); }
+.ord-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14px; color: var(--muted); }
+.ord-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.ask { font-size: 14px; font-weight: 700; color: var(--bad); }
+
+/* 出餐端 */
+.pending { display: flex; flex-direction: column; align-items: center; min-width: 72px; padding: 6px 12px; border-radius: 12px; background: var(--accent); color: var(--on-accent); }
+.pending-n { font-family: var(--font-display); font-size: 32px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.pending-l { font-size: 12px; letter-spacing: 0.1em; }
+.sum { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); }
+.sum-label { font-size: 13px; font-weight: 700; letter-spacing: 0.14em; color: var(--muted); }
+.sum-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.sum-list li { font-size: 18px; font-weight: 700; }
+.sum-list b { font-family: var(--font-display); font-size: 22px; font-variant-numeric: tabular-nums; margin-left: 4px; }
+.sum-list small { font-weight: 400; font-size: 13px; color: var(--muted); }
+.tog { min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--bg); font-weight: 500; }
+.tog[aria-pressed="true"] { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); font-weight: 700; }
+.orders { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 12px; align-items: start; }
+.order { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.order-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.no { font-family: var(--font-display); font-size: 34px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.clock { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+.wait { margin-left: auto; font-size: 13px; font-weight: 700; padding: 2px 10px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); font-variant-numeric: tabular-nums; }
+.wait.late { background: var(--warn-soft); color: var(--warn); }
+.items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.items li { display: flex; flex-direction: column; gap: 6px; padding-top: 12px; border-top: 1px solid var(--line); }
+.items li:first-child { padding-top: 0; border-top: 0; }
+.row { display: flex; align-items: baseline; gap: 8px; }
+.name { font-size: 22px; font-weight: 700; }
+.q { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); }
+.pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.pill { font-size: 15px; font-weight: 700; padding: 3px 12px; border-radius: 8px; background: var(--bg); border: 1.5px solid var(--line); }
+.pill.hot { background: var(--chili); border-color: var(--chili); color: var(--on-chili); }
+.pill.sweet { background: var(--accent-soft); border-color: var(--accent-soft); color: var(--accent); }
+.pill.ice { background: var(--ice-soft); border-color: var(--ice-soft); color: var(--ice); }
+.pill.edited { background: var(--warn-soft); border-color: var(--warn-soft); color: var(--warn); }
+.pill.dine { background: var(--accent-soft); border-color: var(--accent-soft); color: var(--accent); }
+.tagrow { padding-top: 12px; border-top: 1px solid var(--line); }
+.done { width: 100%; min-height: 64px; border: 0; border-radius: 12px; background: var(--accent); color: var(--on-accent); font-size: 20px; font-weight: 700; }
+.done:active:not(:disabled) { transform: scale(0.99); }
+.empty { padding: 36px 16px; text-align: center; color: var(--muted); border: 1.5px dashed var(--line); border-radius: 14px; }
+.empty strong { display: block; font-family: var(--font-display); font-size: 22px; color: var(--ink); margin-bottom: 4px; }
+
+/* 管理者 */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 12px; }
+.kpi { display: flex; flex-direction: column; gap: 2px; padding: 14px 16px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); }
+.kpi-l { font-size: 13px; color: var(--muted); }
+.kpi b { font-family: var(--font-display); font-size: 30px; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.card { display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); min-width: 0; }
+.card h3 { margin: 0; font-family: var(--font-display); font-size: 20px; line-height: 1.25; }
+.card p { margin: 0; font-size: 15px; }
+.card p b { font-family: var(--font-display); font-size: 20px; font-variant-numeric: tabular-nums; }
+.login { max-width: 420px; }
+.bars { display: flex; flex-direction: column; gap: 6px; }
+.bar-row { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; align-items: center; gap: 10px; font-size: 14px; }
+.bar-h { color: var(--muted); font-variant-numeric: tabular-nums; }
+.bar-track { height: 18px; border-radius: 6px; background: var(--bg); overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 6px; background: var(--accent); opacity: 0.45; }
+.bar-row.peak .bar-fill { opacity: 1; }
+.bar-row.peak .bar-h, .bar-row.peak .bar-v { color: var(--accent); font-weight: 700; }
+.bar-v { text-align: right; min-width: 92px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.drow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 16px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 15px; font-variant-numeric: tabular-nums; }
+.drow:first-of-type { border-top: 0; }
+.drow span:nth-child(2), .drow span:nth-child(3) { text-align: right; min-width: 56px; }
+
+/* 菜单编辑 */
+.fld { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.fld > span { font-size: 13px; color: var(--muted); }
+.fld-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 120px), 1fr)); gap: 12px; }
+.inp { width: 100%; min-width: 0; min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; }
+.ed-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.ed-head b { font-family: var(--font-display); font-size: 18px; }
+.ed-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.ed-actions .btn-sm { min-width: 44px; padding: 0 12px; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<!-- 首页 -->
+<div class="wrap w-narrow" id="v-home">
+  <header>
+    <div class="titles">
+      <h1 class="brand">小笼包摊车</h1>
+      <p class="sub">订单</p>
+    </div>
+  </header>
+  <div class="home-grid">
+    <a class="big primary" id="go-order" href="#order"><strong>点餐</strong><span>帮客人点餐、送出订单</span></a>
+    <a class="big" id="go-kitchen" href="#kitchen"><strong>出餐</strong><span>看订单、做好后消掉</span></a>
+    <a class="big" id="go-admin" href="#admin"><strong>管理</strong><span>忙碌时段、营业额、菜单与价格（需要密码）</span></a>
+  </div>
+  <p class="help">点餐和出餐共用同一份订单，点餐送出后，出餐画面会马上出现。第一次在一台手机打开时，要输入店内密码。</p>
+</div>
+
+<!-- 点餐端 -->
+<div class="wrap w-narrow" id="v-order" hidden>
+  <header>
+    <div class="titles">
+      <a class="back" href="#">← 首页</a>
+      <h1 class="brand">小笼包摊车</h1>
+      <p class="sub">点餐端</p>
+    </div>
+  </header>
+  <div class="tools">
+    <span class="conn" id="conn-order" data-state="wait"><span class="dot"></span><span id="conn-order-text">连线中…</span></span>
+    <button type="button" class="ghost" id="open-orders" data-act="orders-open"><span id="open-orders-label">已点订单（0）</span></button>
+  </div>
+  <p class="banner" id="banner-order" hidden></p>
+  <div class="editbar" id="edit-banner" hidden>
+    <span id="edit-text"></span>
+    <button type="button" class="btn-sm" id="edit-cancel" data-act="edit-cancel">放弃修改</button>
+  </div>
+
+  <section aria-labelledby="h-main">
+    <h2 id="h-main">主餐</h2>
+    <div class="menu" id="menu-main"></div>
+  </section>
+  <section aria-labelledby="h-drink">
+    <h2 id="h-drink">饮料</h2>
+    <div class="menu" id="menu-drink"></div>
+  </section>
+</div>
+
+<!-- 出餐端 -->
+<div class="wrap w-wide" id="v-kitchen" hidden>
+  <header>
+    <div class="titles">
+      <a class="back" href="#">← 首页</a>
+      <h1 class="brand">小笼包摊车</h1>
+      <p class="sub">出餐端</p>
+    </div>
+    <div class="pending" aria-live="polite"><span class="pending-n" id="pending-n">0</span><span class="pending-l">待做</span></div>
+  </header>
+  <div class="tools">
+    <span class="conn" id="conn-kitchen" data-state="wait"><span class="dot"></span><span id="conn-kitchen-text">连线中…</span></span>
+    <button type="button" class="ghost" id="sound" data-act="sound">新单提示音：关</button>
+  </div>
+  <p class="banner" id="banner-kitchen" hidden></p>
+  <div class="sum" id="sum" hidden>
+    <span class="sum-label">待做合计</span>
+    <ul class="sum-list" id="sum-list"></ul>
+  </div>
+  <div class="sum">
+    <span class="sum-label">售完管理（点一下切换，隔天自动恢复）</span>
+    <div class="chips" id="sold-chips"></div>
+  </div>
+  <div class="orders" id="orders"></div>
+</div>
+
+<!-- 管理者 -->
+<div class="wrap w-wide" id="v-admin" hidden>
+  <header>
+    <div class="titles">
+      <a class="back" href="#">← 首页</a>
+      <h1 class="brand">小笼包摊车</h1>
+      <p class="sub">管理者</p>
+    </div>
+  </header>
+  <p class="banner" id="admin-deny" hidden></p>
+  <form class="card login" id="admin-login" hidden autocomplete="off">
+    <h3>管理者登录</h3>
+    <label class="fld"><span>密码</span><input class="inp" id="admin-pw" type="password" inputmode="numeric" autocomplete="off"></label>
+    <p class="err" id="admin-pw-err" hidden>密码不对，请再试一次。</p>
+    <button type="submit" class="send" id="admin-pw-go">登录</button>
+  </form>
+  <div class="stack" id="admin-body" hidden>
+    <div class="tools">
+      <div class="chips" role="radiogroup" aria-label="管理项目">
+        <button type="button" id="at-stats" class="chip" role="radio" aria-checked="true" data-act="admin-tab" data-value="stats">统计</button>
+        <button type="button" id="at-menu" class="chip" role="radio" aria-checked="false" data-act="admin-tab" data-value="menu">菜单与价格</button>
+        <button type="button" id="at-reset" class="chip" role="radio" aria-checked="false" data-act="admin-tab" data-value="reset">重置今天</button>
+      </div>
+      <button type="button" class="btn-sm" id="admin-lock" data-act="admin-lock">锁定</button>
+    </div>
+
+    <div class="stack" id="panel-stats">
+      <div class="tools">
+        <div class="chips" role="radiogroup" aria-label="时间范围">
+          <button type="button" id="ar-today" class="chip" role="radio" aria-checked="true" data-act="admin-range" data-value="today">今天</button>
+          <button type="button" id="ar-yesterday" class="chip" role="radio" aria-checked="false" data-act="admin-range" data-value="yesterday">昨天</button>
+          <button type="button" id="ar-week" class="chip" role="radio" aria-checked="false" data-act="admin-range" data-value="week">近 7 天</button>
+        </div>
+        <button type="button" class="ghost" id="admin-refresh" data-act="admin-refresh">重新整理</button>
+      </div>
+      <p class="note" id="admin-status"></p>
+      <div class="stack" id="admin-out"></div>
+    </div>
+
+    <div class="stack" id="panel-menu" hidden>
+      <p class="note">改完按最下面的「储存菜单」，点餐端会马上更新。已经送出的订单不会跟着改价。</p>
+      <div class="stack" id="menu-editor"></div>
+      <div class="tools">
+        <button type="button" class="ghost" id="ed-add" data-act="ed-add">新增品项</button>
+      </div>
+      <p class="note" id="menu-msg"></p>
+      <button type="button" class="send" id="ed-save" data-act="ed-save">储存菜单</button>
+    </div>
+
+    <div class="stack" id="panel-reset" hidden>
+      <div class="card"><h3>重置今天</h3><div class="stack" id="reset-box"></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="gate" hidden>
+  <div class="scrim"></div>
+  <form class="panel" id="gate-form" autocomplete="off">
+    <p><b>请输入店内密码</b></p>
+    <p class="note">第一次在这台手机打开时需要输入一次，之后就不用了。</p>
+    <label class="fld"><span>店内密码</span><input class="inp" id="gate-pw" type="password" inputmode="numeric" autocomplete="off"></label>
+    <p class="err" id="gate-err" hidden>密码不对，请再试一次。</p>
+    <button type="submit" class="send">进入</button>
+  </form>
+</div>
+
+<div class="bar" id="bar" hidden>
+  <button type="button" class="bar-btn" id="bar-open" data-act="open"><span id="bar-label">查看订单</span><span class="badge" id="bar-count">0</span></button>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden>
+  <span id="toast-text"></span>
+  <button type="button" class="undo" id="undo" data-act="undo" hidden>撤销</button>
+</div>
+
+<div class="sheet" id="sheet" hidden>
+  <div class="scrim" data-act="close"></div>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+    <div class="panel-head">
+      <h2 id="sheet-title">本单内容</h2>
+      <button type="button" class="close" id="sheet-close" data-act="close">关闭</button>
+    </div>
+    <div id="sheet-body"></div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+(function () {
+  /* ---------- 设定与预设菜单 ---------- */
+  var ADMIN_PASSWORD = "450608";
+  var SHOP_PASSWORD = "568888";
+  /* 把 Firebase 项目的设定贴在这里（步骤见说明文件）。 */
+  var FIREBASE_CONFIG = {
+    apiKey: "AIzaSyDy78iw191GI5grETGodYlnIquOggWBAyQ",
+    authDomain: "order-system-6d061.firebaseapp.com",
+    projectId: "order-system-6d061",
+    storageBucket: "order-system-6d061.firebasestorage.app",
+    messagingSenderId: "270448467246",
+    appId: "1:270448467246:web:0efa6131a60f75b14b6ebf"
+  };
+  var HOT_RE = /辣椒|双辣|大辣/;
+  var DEFAULT_ITEMS = [
+    { id: "xlb", group: "main", name: "小笼包", unit: "笼", price: 50, fixed: "", optLabel: "辣度", opts: ["不辣", "甜辣酱", "辣椒", "双辣"] },
+    { id: "zj", group: "main", name: "蒸饺", unit: "份", price: 50, fixed: "", optLabel: "辣度", opts: ["不辣", "甜辣酱", "辣椒", "双辣"] },
+    { id: "dj", group: "drink", name: "豆浆", unit: "杯", price: 15, fixed: "温", optLabel: "甜度", opts: ["无糖", "有糖"] },
+    { id: "nt", group: "drink", name: "奶茶", unit: "杯", price: 20, fixed: "", optLabel: "温度", opts: ["温", "冰"] },
+    { id: "ht", group: "drink", name: "红茶", unit: "杯", price: 15, fixed: "", optLabel: "温度", opts: ["温", "冰"] }
+  ];
+
+  /* ---------- 状态 ---------- */
+  var ITEMS = [];
+  var MENU = [];
+  var byId = {};
+  var draft = {};
+  var PRICE_BY_NAME = {};
+
+  var db = null;
+  var ready = false;
+  var canWrite = null;
+  var currentView = "home";
+  var sharedStarted = false;
+  var soldMap = {};
+  var todayOrders = [];
+
+  var cart = [];
+  var cutlery = "要餐具";
+  var bag = "要塑胶袋";
+  var dine = "外带";
+  var editingId = null;
+  var editingNo = 0;
+  var sheetView = "cart";   // cart | done | orders
+  var lastOrder = null;
+  var cancelAsk = null;
+  var sending = false;
+  var sendError = "";
+  var toastTimer = null;
+  var holderId = "h" + Math.random().toString(36).slice(2, 10);
+
+  var orders = [];
+  var kitchenStarted = false;
+  var kitchenLoaded = false;
+  var firstSnap = true;
+  var seenEdit = {};
+  var lastDoneId = null;
+  var soundOn = false;
+  var audio = null;
+  var loadTimer = null;
+  var cleaned = false;
+
+  var adminUnlocked = false;
+  var adminTab = "stats";
+  var adminRange = "today";
+  var adminData = null;
+  var adminToken = 0;
+  var editItems = [];
+  var edDirty = false;
+  var edDelAsk = -1;
+  var resetAsk = false;
+  var resetBusy = false;
+  var resetMsg = "";
+
+  var MIN = 60000;
+
+  function $(s) { return document.querySelector(s); }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function clone(x) { return JSON.parse(JSON.stringify(x)); }
+  function pad(n) { return String(n).padStart(3, "0"); }
+  function pad2(n) { return String(n).padStart(2, "0"); }
+  function total() { return cart.reduce(function (a, l) { return a + l.qty; }, 0); }
+  function cartTotal() { return cart.reduce(function (a, l) { return a + l.qty * byId[l.itemId].price; }, 0); }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function keyOf(d) { return d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()); }
+  function dayKey() { return keyOf(new Date()); }
+  function clock(t) { var d = new Date(t); return pad2(d.getHours()) + ":" + pad2(d.getMinutes()); }
+  function waitMin(t) { return Math.floor((Date.now() - t) / MIN); }
+  function waitText(t) {
+    var m = waitMin(t);
+    if (m < 1) return "刚下单";
+    if (m < 60) return "已等 " + m + " 分";
+    return "已等 " + Math.floor(m / 60) + " 小时";
+  }
+  function chipLabel(v) {
+    if (v === "辣椒") return "辣椒（大辣）";
+    if (v === "双辣") return "双辣（甜辣酱＋辣椒）";
+    return v;
+  }
+  function pillText(v) { return v === "双辣" ? "双辣：甜辣酱＋辣椒" : v; }
+  function pillClass(v) {
+    if (HOT_RE.test(v)) return "pill hot";
+    if (v === "甜辣酱") return "pill sweet";
+    if (v === "冰") return "pill ice";
+    return "pill";
+  }
+  function isSold(id) {
+    var s = soldMap[id];
+    return !!(s && s.out && s.day === dayKey());
+  }
+
+  /* ---------- 菜单（可由管理者修改） ---------- */
+  function buildMenu(items) {
+    return items.map(function (x) {
+      var groups = x.opts && x.opts.length ? [{
+        key: "o", label: x.optLabel || "选项",
+        options: x.opts.map(function (v) { return { v: v, label: chipLabel(v), hot: HOT_RE.test(v) }; })
+      }] : [];
+      return { id: x.id, group: x.group, name: x.name, unit: x.unit, price: x.price, fixed: x.fixed || "", groups: groups };
+    });
+  }
+  function sanitizeItems(raw) {
+    var out = [];
+    raw.forEach(function (x) {
+      if (!x || typeof x.id !== "string" || !/^[A-Za-z0-9_-]{1,40}$/.test(x.id)) return;
+      var name = typeof x.name === "string" ? x.name.trim() : "";
+      var price = Number(x.price);
+      if (!name || !isFinite(price) || price < 0) return;
+      out.push({
+        id: x.id,
+        group: x.group === "drink" ? "drink" : "main",
+        name: name,
+        unit: typeof x.unit === "string" && x.unit.trim() ? x.unit.trim() : "份",
+        price: Math.round(price),
+        fixed: typeof x.fixed === "string" ? x.fixed.trim() : "",
+        optLabel: typeof x.optLabel === "string" ? x.optLabel.trim() : "",
+        opts: Array.isArray(x.opts) ? x.opts.filter(function (v) { return typeof v === "string" && v.trim(); }).map(function (v) { return v.trim(); }) : []
+      });
+    });
+    return out;
+  }
+  function applyMenu(items, initial) {
+    ITEMS = clone(items);
+    MENU = buildMenu(ITEMS);
+    byId = {};
+    PRICE_BY_NAME = {};
+    DEFAULT_ITEMS.forEach(function (p) { PRICE_BY_NAME[p.name] = p.price; });
+    MENU.forEach(function (it) { byId[it.id] = it; PRICE_BY_NAME[it.name] = it.price; });
+    var nd = {};
+    MENU.forEach(function (it) {
+      var old = draft[it.id];
+      nd[it.id] = { qty: old ? old.qty : 1, opts: {} };
+      it.groups.forEach(function (g) {
+        var prev = old && old.opts[g.key];
+        nd[it.id].opts[g.key] = g.options.some(function (o) { return o.v === prev; }) ? prev : g.options[0].v;
+      });
+    });
+    draft = nd;
+    cart = cart.filter(function (l) { return byId[l.itemId]; });
+    if (initial) return;
+    renderMenu();
+    renderSoldPanel();
+    updateBar();
+    if (!$("#sheet").hidden && sheetView === "cart" && !sending) renderSheet();
+  }
+
+  /* ---------- 连线与权限 ---------- */
+  function setConn(which, state, text) {
+    $("#conn-" + which).setAttribute("data-state", state);
+    $("#conn-" + which + "-text").textContent = text;
+  }
+  function setBanner(which, msg) {
+    var el = $("#banner-" + which);
+    el.textContent = msg || "";
+    el.hidden = !msg;
+  }
+  function writeNotice() {
+    if (!ready) return "";
+    if (!db) return "没有连上同步功能。请检查网络，或确认 Firebase 设定已经填好。";
+    if (canWrite === false) return "你目前只能查看，不能送单或消单。请让店主在分享设置里把你设为「可编辑」。";
+    return "";
+  }
+  function refreshOrderStatus() {
+    if (!ready) { setConn("order", "wait", "连线中…"); setBanner("order", ""); return; }
+    if (!db) { setConn("order", "bad", "未连线"); }
+    else if (canWrite === false) { setConn("order", "bad", "只能查看"); }
+    else { setConn("order", "ok", "可以送单"); }
+    setBanner("order", writeNotice());
+    var send = $("#send");
+    if (send) send.disabled = !!writeNotice() || sending;
+    applySoldState();
+    renderSoldPanel();
+  }
+
+  /* ---------- 售完 ---------- */
+  function applySoldState() {
+    MENU.forEach(function (it) {
+      var card = document.querySelector('.item[data-item="' + it.id + '"]');
+      if (!card) return;
+      var s = isSold(it.id);
+      card.classList.toggle("sold", s);
+      card.querySelector(".sold-tag").hidden = !s;
+      Array.prototype.forEach.call(card.querySelectorAll(".chip,.step,.add"), function (b) { b.disabled = s; });
+      var tb = card.querySelector(".link-btn");
+      tb.textContent = s ? "恢复供应" : "标记售完";
+      tb.disabled = !!writeNotice();
+    });
+  }
+  function renderSoldPanel() {
+    var box = $("#sold-chips");
+    var blocked = !!writeNotice();
+    box.innerHTML = MENU.map(function (it) {
+      var s = isSold(it.id);
+      return '<button type="button" id="ksold-' + it.id + '" class="tog" data-act="sold-toggle" data-id="' + it.id + '" aria-pressed="' + s + '"' + (blocked ? " disabled" : "") + ">" +
+        esc(it.name) + " · " + (s ? "已售完" : "有货") + "</button>";
+    }).join("");
+  }
+  async function toggleSold(id) {
+    if (!db || writeNotice() || !byId[id]) return;
+    var next = !isSold(id);
+    try {
+      await db.doc("soldout/" + id).set({ out: next, day: dayKey(), at: Date.now() });
+      showToast(byId[id].name + (next ? " 已标记售完" : " 已恢复供应"), false, currentView === "order");
+    } catch (e) {
+      showToast("没有改成，请再按一次", false, currentView === "order");
+    }
+  }
+
+  /* ---------- 点餐端 ---------- */
+  function itemHTML(it) {
+    var d = draft[it.id];
+    var groups = it.groups.map(function (g) {
+      var chips = g.options.map(function (o, i) {
+        return '<button type="button" id="opt-' + it.id + "-" + g.key + "-" + i + '" class="chip' + (o.hot ? " hot" : "") +
+          '" role="radio" aria-checked="' + (d.opts[g.key] === o.v) + '" data-act="pick" data-group="' + g.key + '" data-value="' + esc(o.v) + '">' + esc(o.label) + "</button>";
+      }).join("");
+      return '<div class="opt"><span class="opt-label">' + esc(g.label) + '</span><div class="chips" role="radiogroup" aria-label="' + esc(g.label) + '">' + chips + "</div></div>";
+    }).join("");
+    return '<article class="item" data-item="' + it.id + '">' +
+      '<div class="item-head"><h3>' + esc(it.name) + "</h3>" + (it.fixed ? '<span class="tag">只有' + esc(it.fixed) + "</span>" : "") +
+      '<span class="tag sold-tag" hidden>已售完</span><span class="price">' + it.price + " 元/" + esc(it.unit) + "</span></div>" +
+      groups +
+      '<div class="item-foot">' +
+      '<div class="stepper"><button type="button" id="dec-' + it.id + '" class="step" data-act="q-dec" aria-label="减少">−</button>' +
+      '<span class="qty" id="qty-' + it.id + '">' + d.qty + "<small>" + esc(it.unit) + "</small></span>" +
+      '<button type="button" id="inc-' + it.id + '" class="step" data-act="q-inc" aria-label="增加">+</button></div>' +
+      '<button type="button" id="add-' + it.id + '" class="add" data-act="add">加入订单 · ' + d.qty * it.price + " 元</button>" +
+      "</div>" +
+      '<button type="button" id="sold-' + it.id + '" class="link-btn" data-act="sold-toggle">标记售完</button>' +
+      "</article>";
+  }
+  function renderMenu() {
+    ["main", "drink"].forEach(function (grp) {
+      var list = MENU.filter(function (it) { return it.group === grp; });
+      $("#menu-" + grp).innerHTML = list.length ? list.map(itemHTML).join("") : '<p class="empty-s">这个分类目前没有品项。</p>';
+    });
+    applySoldState();
+  }
+  function setQtyText(id) {
+    $("#qty-" + id).innerHTML = draft[id].qty + "<small>" + esc(byId[id].unit) + "</small>";
+    $("#add-" + id).textContent = "加入订单 · " + draft[id].qty * byId[id].price + " 元";
+  }
+  function updateBar() {
+    var n = total();
+    $("#bar").hidden = !(currentView === "order" && n > 0);
+    $("#bar-count").textContent = n;
+    $("#bar-label").textContent = (editingId ? "更新订单 #" + pad(editingNo) : "查看订单") + " · " + cartTotal() + " 元";
+  }
+  function showEditBar() {
+    $("#edit-banner").hidden = !editingId;
+    if (editingId) $("#edit-text").textContent = "正在修改 #" + pad(editingNo) + "，改好后按「更新订单」。整张取消请到「已点订单」。";
+  }
+  function showToast(msg, withUndo, high, ms) {
+    var el = $("#toast");
+    $("#toast-text").textContent = msg;
+    $("#undo").hidden = !withUndo;
+    el.classList.toggle("has-undo", !!withUndo);
+    el.classList.toggle("high", !!high);
+    el.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.hidden = true; lastDoneId = null; }, ms || (withUndo ? 6000 : 1800));
+  }
+
+  function lineHTML(l, i) {
+    var it = byId[l.itemId];
+    return '<li class="line"><div class="line-main"><div class="line-name">' + esc(it.name) + '</div><div class="line-opts">' + esc(l.text) +
+      (isSold(l.itemId) ? ' <span class="soldmark">已售完</span>' : "") + "</div></div>" +
+      '<span class="line-price">' + l.qty * it.price + " 元</span>" +
+      '<div class="stepper"><button type="button" id="ldec-' + i + '" class="step" data-act="l-dec" data-i="' + i + '" aria-label="减少">−</button>' +
+      '<span class="qty">' + l.qty + '</span>' +
+      '<button type="button" id="linc-' + i + '" class="step" data-act="l-inc" data-i="' + i + '" aria-label="增加">+</button></div></li>';
+  }
+
+  function statusPill(s) {
+    if (s === "pending") return '<span class="st">制作中</span>';
+    if (s === "done") return '<span class="st done">已出餐</span>';
+    return '<span class="st cancel">已取消</span>';
+  }
+  function ordHTML(o) {
+    var lines = o.lines.map(function (l) {
+      return "<li>" + esc(l.name) + " × " + esc(l.qty) + " " + esc(l.unit) + (l.opts.length ? " · " + l.opts.map(function (v) { return esc(pillText(v)); }).join(" · ") : "") + "</li>";
+    }).join("");
+    var foot = [];
+    if (o.dine) foot.push(o.dine);
+    if (o.cutlery) foot.push(o.cutlery);
+    if (o.bag) foot.push(o.bag);
+    if (o.total != null) foot.push(o.total + " 元");
+    if (o.editedAt) foot.push("已修改");
+    var actions = "";
+    if (o.status === "pending") {
+      var blocked = writeNotice() ? " disabled" : "";
+      if (cancelAsk === o.id) {
+        actions = '<span class="ask">确定取消 #' + esc(pad(o.no)) + "？</span>" +
+          '<button type="button" id="cy-' + esc(o.id) + '" class="btn-sm btn-danger" data-act="cancel-yes" data-oid="' + esc(o.id) + '"' + blocked + ">确定取消</button>" +
+          '<button type="button" id="cn-' + esc(o.id) + '" class="btn-sm" data-act="cancel-no">不取消</button>';
+      } else {
+        actions = '<button type="button" id="oe-' + esc(o.id) + '" class="btn-sm" data-act="ord-edit" data-oid="' + esc(o.id) + '"' + blocked + ">修改</button>" +
+          '<button type="button" id="oc-' + esc(o.id) + '" class="btn-sm btn-danger" data-act="ord-cancel" data-oid="' + esc(o.id) + '"' + blocked + ">取消</button>";
+      }
+    }
+    return '<li class="ord' + (o.status === "cancelled" ? " cancelled" : "") + '"><div class="ord-head"><span class="ord-no">#' + esc(pad(o.no)) + '</span><span class="ord-time">' + clock(o.createdAt) + "</span>" + statusPill(o.status) + "</div>" +
+      '<ul class="ord-lines">' + lines + "</ul>" +
+      '<div class="ord-foot"><span>' + foot.map(esc).join(" · ") + '</span><div class="ord-actions">' + actions + "</div></div></li>";
+  }
+  function ordersListHTML() {
+    var list = todayOrders.slice().sort(function (a, b) {
+      var ra = a.status === "pending" ? 0 : 1;
+      var rb = b.status === "pending" ? 0 : 1;
+      if (ra !== rb) return ra - rb;
+      return b.createdAt - a.createdAt;
+    }).slice(0, 40);
+    if (!list.length) return '<p class="empty-s">今天还没有订单。</p>';
+    return '<ul class="lines">' + list.map(ordHTML).join("") + "</ul>";
+  }
+  function pendingCount() { return todayOrders.filter(function (o) { return o.status === "pending"; }).length; }
+  function updateOrdersCount() { $("#open-orders-label").textContent = "已点订单（" + pendingCount() + "）"; }
+
+  function radioRow(label, name, pairs, current, act) {
+    return '<div class="opt" style="margin-top:14px"><span class="opt-label">' + label + '</span><div class="chips" role="radiogroup" aria-label="' + label + '">' +
+      pairs.map(function (p, i) {
+        return '<button type="button" id="' + name + "-" + i + '" class="chip" role="radio" aria-checked="' + (current === p[0]) + '" data-act="' + act + '" data-value="' + p[0] + '">' + p[1] + "</button>";
+      }).join("") + "</div></div>";
+  }
+
+  function renderSheet() {
+    var body = $("#sheet-body");
+    var title = $("#sheet-title");
+    if (sheetView === "orders") {
+      title.textContent = "今天的订单";
+      body.innerHTML = ordersListHTML();
+      return;
+    }
+    if (sheetView === "done" && lastOrder) {
+      title.textContent = lastOrder.edited ? "订单已更新" : "订单已送出";
+      body.innerHTML = '<div class="done-box"><p class="done-label">取餐号码</p><p class="done-no">' + pad(lastOrder.no) + "</p></div>" +
+        '<ul class="lines">' + lastOrder.lines.map(function (l) {
+          return '<li class="line"><div class="line-main"><div class="line-name">' + esc(l.name) + " × " + l.qty + " " + esc(l.unit) + '</div><div class="line-opts">' + l.opts.map(function (v) { return esc(pillText(v)); }).join(" · ") + '</div></div><span class="line-price">' + l.qty * l.price + " 元</span></li>";
+        }).join("") + "</ul>" +
+        '<p class="total"><span>' + lastOrder.dine + " · " + lastOrder.cutlery + " · " + lastOrder.bag + '</span><b>' + lastOrder.total + " 元</b></p>" +
+        '<p class="note">出餐画面已经收到这张单。</p>' +
+        '<button type="button" id="again" class="send" data-act="again">继续点下一单</button>';
+      return;
+    }
+    title.textContent = editingId ? "修改 #" + pad(editingNo) : "本单内容";
+    if (!cart.length) {
+      body.innerHTML = '<p class="empty-s">订单是空的，先在菜单上加一份。</p><button type="button" id="back" class="ghost" data-act="close" style="width:100%;margin-top:14px">回到菜单</button>';
+      return;
+    }
+    var notice = writeNotice();
+    body.innerHTML = '<ul class="lines">' + cart.map(lineHTML).join("") + "</ul>" +
+      radioRow("餐具", "cut", [["要餐具", "要餐具"], ["不要餐具", "不要餐具"]], cutlery, "cut") +
+      radioRow("塑胶袋", "bag", [["要塑胶袋", "要塑胶袋"], ["不要塑胶袋", "不要塑胶袋"]], bag, "bag") +
+      radioRow("用餐方式", "dine", [["外带", "外带"], ["内用", "内用（不外带）"]], dine, "dine") +
+      (sendError ? '<p class="err" style="margin-top:12px">' + esc(sendError) + "</p>" : "") +
+      (notice ? '<p class="err" style="margin-top:12px">' + esc(notice) + "</p>" : "") +
+      '<button type="button" id="send" class="send" data-act="send" style="margin-top:14px"' + (notice || sending ? " disabled" : "") + ">" +
+      (sending ? (editingId ? "更新中…" : "送出中…") : (editingId ? "更新订单 #" + pad(editingNo) : "送出订单") + "（共 " + total() + " 件 · " + cartTotal() + " 元）") + "</button>";
+  }
+  function openSheet(view) { sheetView = view; sendError = ""; cancelAsk = null; renderSheet(); $("#sheet").hidden = false; }
+  function closeSheet() {
+    $("#sheet").hidden = true;
+    cancelAsk = null;
+    if (sheetView === "done") lastOrder = null;
+    sheetView = "cart";
+  }
+
+  async function nextNumber() {
+    var ref = db.doc("meta/counter-" + dayKey());
+    for (var i = 0; i < 8; i++) {
+      var r = await ref.acquire({ holder: holderId, ttlMs: 1000 });
+      if (r.acquired) {
+        var snap = await ref.get();
+        var cur = snap.exists ? Number(snap.data().n) || 0 : 0;
+        var n = cur + 1;
+        await ref.set({ n: n });
+        return n;
+      }
+      await sleep(400);
+    }
+    throw new Error("busy");
+  }
+
+  async function submitOrder() {
+    if (sending || !cart.length || !db || writeNotice()) return;
+    var soldNames = cart.filter(function (l) { return isSold(l.itemId); }).map(function (l) { return byId[l.itemId].name; });
+    if (soldNames.length) {
+      sendError = soldNames.join("、") + " 已售完，请先从订单里减掉。";
+      renderSheet();
+      return;
+    }
+    sending = true; sendError = ""; renderSheet();
+    var lines = cart.map(function (l) {
+      var it = byId[l.itemId];
+      return { name: it.name, unit: it.unit, qty: l.qty, opts: l.opts.slice(), price: it.price };
+    });
+    var orderTotal = cartTotal();
+    try {
+      if (editingId) {
+        var ref = db.doc("orders/" + editingId);
+        var cur = await ref.get();
+        if (!cur.exists || cur.data().status !== "pending") throw new Error("locked");
+        await ref.update({ lines: lines, total: orderTotal, cutlery: cutlery, bag: bag, dine: dine, editedAt: Date.now() });
+        lastOrder = { no: editingNo, lines: lines, total: orderTotal, cutlery: cutlery, bag: bag, dine: dine, edited: true };
+        editingId = null; editingNo = 0;
+      } else {
+        var no = await nextNumber();
+        var id = "o" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        await db.doc("orders/" + id).set({ no: no, day: dayKey(), createdAt: Date.now(), status: "pending", total: orderTotal, cutlery: cutlery, bag: bag, dine: dine, lines: lines });
+        lastOrder = { no: no, lines: lines, total: orderTotal, cutlery: cutlery, bag: bag, dine: dine, edited: false };
+      }
+      cart = [];
+      cutlery = "要餐具";
+      bag = "要塑胶袋";
+      dine = "外带";
+      sheetView = "done";
+      showEditBar();
+    } catch (e) {
+      sendError = e && e.message === "locked"
+        ? "这张单已经做好或被取消，不能再修改了。请按「放弃修改」。"
+        : "没有送出去，订单还在。检查一下网络，再按一次送出。";
+    }
+    sending = false;
+    updateBar();
+    renderSheet();
+  }
+
+  function startEdit(oid) {
+    var o = todayOrders.filter(function (x) { return x.id === oid; })[0];
+    if (!o || o.status !== "pending") return;
+    if (cart.length && !editingId) {
+      showToast("先送出目前的订单，再来修改", false, false, 2600);
+      return;
+    }
+    var next = [];
+    var missing = false;
+    o.lines.forEach(function (l) {
+      var it = MENU.filter(function (m) { return m.name === l.name; })[0];
+      if (!it) { missing = true; return; }
+      var text = l.opts.join(" · ");
+      var ex = next.filter(function (c) { return c.itemId === it.id && c.text === text; })[0];
+      if (ex) ex.qty += l.qty; else next.push({ itemId: it.id, opts: l.opts.slice(), text: text, qty: l.qty });
+    });
+    cart = next;
+    editingId = oid; editingNo = o.no;
+    cutlery = o.cutlery || "要餐具";
+    bag = o.bag || "要塑胶袋";
+    dine = o.dine || "外带";
+    showEditBar();
+    updateBar();
+    openSheet("cart");
+    if (missing) showToast("有品项已经不在菜单上，没有载入", false, false, 3500);
+  }
+  function cancelEdit() {
+    cart = []; editingId = null; editingNo = 0; cutlery = "要餐具"; bag = "要塑胶袋"; dine = "外带";
+    showEditBar(); updateBar();
+    if (!$("#sheet").hidden) closeSheet();
+  }
+  async function cancelOrder(oid) {
+    if (!db || writeNotice()) return;
+    try {
+      var ref = db.doc("orders/" + oid);
+      var cur = await ref.get();
+      if (!cur.exists || cur.data().status !== "pending") {
+        cancelAsk = null; renderSheet();
+        showToast("这张单已经做好或取消了", false, false, 2600);
+        return;
+      }
+      await ref.update({ status: "cancelled", cancelledAt: Date.now() });
+      cancelAsk = null;
+      if (editingId === oid) { cart = []; editingId = null; editingNo = 0; showEditBar(); updateBar(); }
+      renderSheet();
+      showToast("订单已取消", false, false, 2200);
+    } catch (e) {
+      showToast("没有取消成功，请再按一次", false, false, 2600);
+    }
+  }
+
+  /* ---------- 共用订阅（菜单、售完、今天的订单） ---------- */
+  function startShared() {
+    if (sharedStarted || !ready || !db) return;
+    sharedStarted = true;
+    db.doc("config/menu").onSnapshot(function (snap) {
+      if (!snap.exists) return;
+      var x = snap.data();
+      if (!x || !Array.isArray(x.items)) return;
+      var clean = sanitizeItems(x.items);
+      if (!clean.length) return;
+      applyMenu(clean);
+      if (!edDirty) loadEditorFromMenu();
+    }, function () {});
+    db.collection("soldout").onSnapshot(function (snap) {
+      var m = {};
+      snap.docs.forEach(function (d) { m[d.id] = d.data(); });
+      soldMap = m;
+      applySoldState();
+      renderSoldPanel();
+      if (!$("#sheet").hidden && sheetView === "cart" && !sending) renderSheet();
+    }, function () {});
+    db.collection("orders").where("day", "==", dayKey()).onSnapshot(function (snap) {
+      todayOrders = snap.docs.map(function (d) {
+        var x = d.data();
+        return {
+          id: d.id, no: x.no, createdAt: x.createdAt, status: x.status, total: x.total, dine: x.dine,
+          cutlery: x.cutlery, bag: x.bag, editedAt: x.editedAt,
+          lines: (x.lines || []).map(function (l) { return { name: l.name, unit: l.unit, qty: l.qty, opts: l.opts || [], price: l.price }; })
+        };
+      });
+      updateOrdersCount();
+      if (!$("#sheet").hidden && sheetView === "orders") renderSheet();
+    }, function () {});
+  }
+
+  /* ---------- 出餐端 ---------- */
+  function orderHTML(o) {
+    var items = o.lines.map(function (l) {
+      return '<li><div class="row"><span class="name">' + esc(l.name) + '</span><span class="q">× ' + esc(l.qty) + " " + esc(l.unit) + "</span></div>" +
+        '<div class="pills">' + l.opts.map(function (v) { return '<span class="' + pillClass(v) + '">' + esc(pillText(v)) + "</span>"; }).join("") + "</div></li>";
+    }).join("");
+    var tags = [];
+    if (o.dine) tags.push('<span class="pill' + (o.dine === "内用" ? " dine" : "") + '">' + esc(o.dine) + "</span>");
+    if (o.cutlery) tags.push('<span class="pill' + (o.cutlery === "不要餐具" ? " ice" : "") + '">' + esc(o.cutlery) + "</span>");
+    if (o.bag) tags.push('<span class="pill' + (o.bag === "不要塑胶袋" ? " ice" : "") + '">' + esc(o.bag) + "</span>");
+    if (o.editedAt) tags.push('<span class="pill edited">订单已修改</span>');
+    return '<article class="order" data-no="' + esc(o.no) + '">' +
+      '<div class="order-head"><span class="no">#' + esc(pad(o.no)) + '</span><span class="clock">' + clock(o.createdAt) + ' 下单</span>' +
+      '<span class="wait' + (waitMin(o.createdAt) >= 5 ? " late" : "") + '" data-at="' + o.createdAt + '">' + waitText(o.createdAt) + "</span></div>" +
+      '<ul class="items">' + items + "</ul>" +
+      (tags.length ? '<div class="pills tagrow">' + tags.join("") + "</div>" : "") +
+      '<button type="button" id="done-' + esc(o.id) + '" class="done" data-act="done" data-id="' + esc(o.id) + '"' + (canWrite === false ? " disabled" : "") + ">做好了</button></article>";
+  }
+  function renderKitchen() {
+    orders.sort(function (a, b) { return a.createdAt - b.createdAt; });
+    $("#pending-n").textContent = orders.length;
+    var box = $("#orders");
+    if (!orders.length) {
+      var head = "目前没有待做的订单";
+      var tail = "点餐端一送出，新订单就会出现在这里。";
+      if (!kitchenLoaded) { head = ready && !db ? "没有连上订单" : "正在载入订单…"; tail = ready && !db ? "请检查网络，或确认 Firebase 设定已经填好。" : "稍等一下。"; }
+      box.innerHTML = '<div class="empty" style="grid-column:1/-1"><strong>' + head + "</strong>" + tail + "</div>";
+    } else {
+      box.innerHTML = orders.map(orderHTML).join("");
+    }
+    var totals = {}, names = [];
+    orders.forEach(function (o) {
+      o.lines.forEach(function (l) {
+        if (!totals[l.name]) { totals[l.name] = { qty: 0, unit: l.unit }; names.push(l.name); }
+        totals[l.name].qty += Number(l.qty) || 0;
+      });
+    });
+    $("#sum").hidden = names.length === 0;
+    $("#sum-list").innerHTML = names.map(function (n) {
+      return "<li>" + esc(n) + "<b>" + totals[n].qty + "</b><small>" + esc(totals[n].unit) + "</small></li>";
+    }).join("");
+  }
+  function updateWaits() {
+    Array.prototype.forEach.call(document.querySelectorAll(".wait"), function (el) {
+      var at = Number(el.getAttribute("data-at"));
+      el.textContent = waitText(at);
+      el.classList.toggle("late", waitMin(at) >= 5);
+    });
+  }
+  function beep() {
+    if (!soundOn || !audio) return;
+    try {
+      [0, 0.22].forEach(function (t) {
+        var o = audio.createOscillator();
+        var g = audio.createGain();
+        o.frequency.value = 880; g.gain.value = 0.2;
+        o.connect(g); g.connect(audio.destination);
+        o.start(audio.currentTime + t); o.stop(audio.currentTime + t + 0.14);
+      });
+    } catch (e) {}
+  }
+  function toggleSound() {
+    try {
+      if (!audio) { var AC = window.AudioContext || window.webkitAudioContext; if (AC) audio = new AC(); }
+      if (audio && audio.state === "suspended") audio.resume();
+    } catch (e) {}
+    soundOn = !soundOn && !!audio;
+    $("#sound").textContent = "新单提示音：" + (soundOn ? "开" : "关");
+    if (soundOn) beep();
+  }
+
+  async function cleanupOld() {
+    if (canWrite === false) return;
+    try {
+      var snap = await db.collection("orders").where("createdAt", "<", Date.now() - 45 * 86400000).limit(100).get();
+      for (var i = 0; i < snap.docs.length; i++) {
+        var d = snap.docs[i];
+        var st = d.data().status;
+        if (st === "done" || st === "cancelled") await db.doc("orders/" + d.id).delete();
+      }
+    } catch (e) {}
+  }
+  function announceIfCancelled(id, last) {
+    db.doc("orders/" + id).get().then(function (s) {
+      if (s.exists && s.data().status === "cancelled") {
+        var no = (last && last.no) || s.data().no;
+        showToast("#" + pad(no) + " 已被取消，不用做了", false, false, 10000);
+        beep();
+      }
+    }).catch(function () {});
+  }
+
+  function startKitchen() {
+    if (kitchenStarted || !ready) return;
+    kitchenStarted = true;
+    setBanner("kitchen", writeNotice());
+    if (!db) { setConn("kitchen", "bad", "未连线"); renderKitchen(); return; }
+    setConn("kitchen", "wait", "连线中…");
+    loadTimer = setTimeout(function () { setConn("kitchen", "wait", "连不上，画面可能不是最新"); }, 10000);
+    db.collection("orders").where("status", "==", "pending").onSnapshot(function (snap) {
+      var wasFirst = firstSnap;
+      var edited = false;
+      orders = snap.docs.map(function (d) {
+        var x = d.data();
+        if (x.editedAt && seenEdit[d.id] !== x.editedAt) { if (!wasFirst) edited = true; seenEdit[d.id] = x.editedAt; }
+        return { id: d.id, no: x.no, createdAt: x.createdAt, cutlery: x.cutlery, bag: x.bag, dine: x.dine, editedAt: x.editedAt, lines: x.lines || [] };
+      });
+      if (!snap.metadata.fromCache) {
+        clearTimeout(loadTimer);
+        kitchenLoaded = true;
+        setConn("kitchen", "ok", "已连线");
+      }
+      var isNew = !wasFirst && snap.docChanges().some(function (c) { return c.type === "added"; });
+      if (!wasFirst) {
+        snap.docChanges().forEach(function (c) { if (c.type === "removed") announceIfCancelled(c.doc.id, c.doc.data()); });
+      }
+      firstSnap = false;
+      renderKitchen();
+      if (isNew || edited) beep();
+      if (edited) showToast("有订单被修改了，请看标示「订单已修改」的那张", false, false, 8000);
+      if (!snap.metadata.fromCache && !cleaned) { cleaned = true; cleanupOld(); }
+    }, function () {
+      clearTimeout(loadTimer);
+      setConn("kitchen", "bad", "连线中断，请重新打开页面");
+    });
+  }
+
+  async function markDone(id) {
+    if (canWrite === false || !db) return;
+    try {
+      await db.doc("orders/" + id).update({ status: "done", doneAt: Date.now() });
+      lastDoneId = id;
+      showToast("已完成一张单", true, false);
+    } catch (e) {
+      showToast("没有消掉，请再按一次", false, false);
+    }
+  }
+  async function undoDone() {
+    var id = lastDoneId;
+    $("#toast").hidden = true;
+    if (!id || !db) return;
+    lastDoneId = null;
+    try { await db.doc("orders/" + id).update({ status: "pending", doneAt: null }); } catch (e) {}
+  }
+
+  /* ---------- 管理者：登录与分页 ---------- */
+  function lastDays(n) {
+    var out = [];
+    for (var i = 0; i < n; i++) { var d = new Date(); d.setDate(d.getDate() - i); out.push(keyOf(d)); }
+    return out;
+  }
+  function keyLabel(k) {
+    var d = new Date(Number(k.slice(0, 4)), Number(k.slice(4, 6)) - 1, Number(k.slice(6, 8)));
+    return (d.getMonth() + 1) + "/" + d.getDate() + "（周" + "日一二三四五六".charAt(d.getDay()) + "）";
+  }
+  function minuteOfDay(t) { var d = new Date(t); return d.getHours() * 60 + d.getMinutes(); }
+  function lineValue(l) {
+    var p = typeof l.price === "number" ? l.price : (PRICE_BY_NAME[l.name] || 0);
+    return p * (Number(l.qty) || 0);
+  }
+  function orderValue(o) {
+    if (typeof o.total === "number") return o.total;
+    return o.lines.reduce(function (a, l) { return a + lineValue(l); }, 0);
+  }
+  function sumValue(list) { return list.reduce(function (a, o) { return a + orderValue(o); }, 0); }
+  function notCancelled(o) { return o.status !== "cancelled"; }
+
+  function applyAdminGate() {
+    var deny = $("#admin-deny");
+    var login = $("#admin-login");
+    var body = $("#admin-body");
+    if (!ready) { deny.hidden = false; deny.textContent = "载入中…"; login.hidden = true; body.hidden = true; return; }
+    if (!db) {
+      deny.hidden = false;
+      deny.textContent = "没有连上同步功能。请检查网络，或确认 Firebase 设定已经填好。";
+      login.hidden = true; body.hidden = true;
+      return;
+    }
+    deny.hidden = true;
+    login.hidden = adminUnlocked;
+    body.hidden = !adminUnlocked;
+    if (adminUnlocked) showAdminTab();
+  }
+  function showAdminTab() {
+    ["stats", "menu", "reset"].forEach(function (t) { $("#panel-" + t).hidden = adminTab !== t; });
+    Array.prototype.forEach.call(document.querySelectorAll('#admin-body [data-act="admin-tab"]'), function (c) {
+      c.setAttribute("aria-checked", c.getAttribute("data-value") === adminTab ? "true" : "false");
+    });
+    if (adminTab === "reset") renderReset();
+    if (adminTab === "menu") renderEditor();
+  }
+
+  /* ---------- 管理者：统计 ---------- */
+  async function loadAdmin() {
+    if (!adminUnlocked || !db) return;
+    var token = ++adminToken;
+    $("#admin-status").textContent = "读取中…";
+    var keys = lastDays(7);
+    var days = {};
+    try {
+      for (var i = 0; i < keys.length; i++) {
+        var snap = await db.collection("orders").where("day", "==", keys[i]).get();
+        days[keys[i]] = snap.docs.map(function (d) {
+          var x = d.data();
+          return {
+            createdAt: Number(x.createdAt) || 0, status: x.status, total: x.total,
+            lines: (x.lines || []).map(function (l) { return { name: String(l.name), unit: String(l.unit), qty: Number(l.qty) || 0, price: l.price }; })
+          };
+        });
+        if (token !== adminToken) return;
+      }
+      adminData = { days: days, at: Date.now() };
+      renderAdmin();
+      if (adminTab === "reset") renderReset();
+    } catch (e) {
+      $("#admin-status").textContent = "读取失败，请按「重新整理」再试一次。";
+    }
+  }
+
+  function renderAdmin() {
+    if (!adminData) return;
+    Array.prototype.forEach.call(document.querySelectorAll('#panel-stats [data-act="admin-range"]'), function (c) {
+      c.setAttribute("aria-checked", c.getAttribute("data-value") === adminRange ? "true" : "false");
+    });
+    var today = dayKey();
+    var week = lastDays(7);
+    var keys = adminRange === "today" ? [today] : adminRange === "yesterday" ? [week[1]] : week;
+    var all = [];
+    keys.forEach(function (k) { (adminData.days[k] || []).forEach(function (o) { all.push(o); }); });
+    var live = all.filter(notCancelled);
+    var cancelled = all.length - live.length;
+    var revenue = sumValue(live);
+    var avg = live.length ? Math.round(revenue / live.length) : 0;
+
+    var hours = {};
+    var items = {};
+    live.forEach(function (o) {
+      var hr = new Date(o.createdAt).getHours();
+      if (!hours[hr]) hours[hr] = { n: 0, rev: 0 };
+      hours[hr].n += 1;
+      hours[hr].rev += orderValue(o);
+      o.lines.forEach(function (l) {
+        if (!items[l.name]) items[l.name] = { qty: 0, unit: l.unit, rev: 0 };
+        items[l.name].qty += l.qty;
+        items[l.name].rev += lineValue(l);
+      });
+    });
+    var hs = Object.keys(hours).map(Number).sort(function (a, b) { return a - b; });
+    var peakH = -1, peakN = 0;
+    hs.forEach(function (hr) { if (hours[hr].n > peakN) { peakN = hours[hr].n; peakH = hr; } });
+
+    var bars = "";
+    if (hs.length) {
+      for (var hh = hs[0]; hh <= hs[hs.length - 1]; hh++) {
+        var hv = hours[hh] || { n: 0, rev: 0 };
+        var pct = peakN ? Math.round(hv.n / peakN * 100) : 0;
+        bars += '<div class="bar-row' + (hh === peakH ? " peak" : "") + '"><span class="bar-h">' + pad2(hh) + ':00</span><div class="bar-track"><div class="bar-fill" style="width:' + pct + '%"></div></div><span class="bar-v">' + hv.n + " 张 · " + hv.rev + " 元</span></div>";
+      }
+    }
+    var peakLine = peakH >= 0
+      ? "最忙：<b>" + pad2(peakH) + ":00–" + pad2(peakH + 1) + ":00</b>，" + peakN + " 张订单，约 " + hours[peakH].rev + " 元（占全部订单的 " + Math.round(peakN / live.length * 100) + "%）。"
+      : "这段时间还没有订单。";
+
+    var proj = "";
+    if (adminRange === "today") {
+      var nowM = minuteOfDay(Date.now());
+      var ratios = [];
+      week.slice(1).forEach(function (k) {
+        var os = (adminData.days[k] || []).filter(notCancelled);
+        var tot = sumValue(os);
+        if (tot <= 0) return;
+        var before = sumValue(os.filter(function (o) { return minuteOfDay(o.createdAt) <= nowM; }));
+        ratios.push(before / tot);
+      });
+      if (ratios.length >= 2) {
+        var r = ratios.reduce(function (a, b) { return a + b; }, 0) / ratios.length;
+        proj = r >= 0.1
+          ? "<p>全天预估：约 <b>" + Math.round(revenue / r) + " 元</b>（参考过去 " + ratios.length + " 天到这个时间为止的营业额占比）。</p>"
+          : '<p class="note">现在时间还早，全天预估还不稳定。</p>';
+      } else {
+        proj = '<p class="note">过去的订单资料还不够，累积 2 天以上才会出现全天预估。</p>';
+      }
+    }
+
+    var names = Object.keys(items).sort(function (a, b) { return items[b].qty - items[a].qty; });
+    var itemRows = names.map(function (n) {
+      return '<div class="drow"><span>' + esc(n) + "</span><span>" + items[n].qty + " " + esc(items[n].unit) + "</span><span>" + items[n].rev + " 元</span></div>";
+    }).join("");
+    var dayRows = week.map(function (k) {
+      var os = (adminData.days[k] || []).filter(notCancelled);
+      return '<div class="drow"><span>' + keyLabel(k) + (k === today ? "（今天）" : "") + "</span><span>" + os.length + " 张</span><span>" + sumValue(os) + " 元</span></div>";
+    }).join("");
+
+    var html = '<div class="kpis">' +
+      '<div class="kpi"><span class="kpi-l">订单数</span><b>' + live.length + "</b></div>" +
+      '<div class="kpi"><span class="kpi-l">营业额（预估）</span><b>' + revenue + " 元</b></div>" +
+      '<div class="kpi"><span class="kpi-l">平均每张</span><b>' + avg + " 元</b></div>" +
+      '<div class="kpi"><span class="kpi-l">已取消</span><b>' + cancelled + " 张</b></div></div>" +
+      '<div class="card"><h3>营业额预估</h3><p>' + (adminRange === "today" ? "目前累计" : "合计") + "：<b>" + revenue + ' 元</b>。</p>' + proj +
+      '<p class="note">依订单金额加总，不含已取消的订单。系统还没有记录实际收款，所以只是预估。</p></div>' +
+      '<div class="card"><h3>最忙时段</h3><p>' + peakLine + '</p><div class="bars">' + bars + "</div></div>" +
+      (names.length ? '<div class="card"><h3>卖得最多</h3><div>' + itemRows + "</div></div>" : "") +
+      (adminRange === "week" ? '<div class="card"><h3>每天的订单与营业额</h3><div>' + dayRows + "</div></div>" : "");
+    $("#admin-out").innerHTML = html;
+    $("#admin-status").textContent = "更新于 " + clock(adminData.at) + "。资料保留最近 45 天。";
+  }
+
+  /* ---------- 管理者：菜单与价格 ---------- */
+  function toEditorModel(it) {
+    return { id: it.id, group: it.group, name: it.name, unit: it.unit, priceText: String(it.price), optLabel: it.optLabel || "", optsText: (it.opts || []).join("、"), fixed: it.fixed || "" };
+  }
+  function loadEditorFromMenu() {
+    editItems = ITEMS.map(toEditorModel);
+    edDirty = false;
+    edDelAsk = -1;
+    if (adminUnlocked && adminTab === "menu") renderEditor();
+  }
+  function setMenuMsg(msg, bad) {
+    var el = $("#menu-msg");
+    el.textContent = msg || "";
+    el.className = bad ? "err" : "note";
+  }
+  function renderEditor() {
+    var box = $("#menu-editor");
+    if (!editItems.length) { box.innerHTML = '<p class="empty-s">目前没有品项，请按「新增品项」。</p>'; return; }
+    box.innerHTML = editItems.map(function (e, i) {
+      var delBtns = edDelAsk === i
+        ? '<span class="ask">确定删除？</span><button type="button" id="ed-dy-' + i + '" class="btn-sm btn-danger" data-act="ed-del-yes" data-i="' + i + '">确定</button><button type="button" id="ed-dn-' + i + '" class="btn-sm" data-act="ed-del-no">不要</button>'
+        : '<button type="button" id="ed-up-' + i + '" class="btn-sm" data-act="ed-up" data-i="' + i + '" aria-label="上移"' + (i === 0 ? " disabled" : "") + '>↑</button>' +
+          '<button type="button" id="ed-dw-' + i + '" class="btn-sm" data-act="ed-down" data-i="' + i + '" aria-label="下移"' + (i === editItems.length - 1 ? " disabled" : "") + '>↓</button>' +
+          '<button type="button" id="ed-del-' + i + '" class="btn-sm btn-danger" data-act="ed-del" data-i="' + i + '">删除</button>';
+      return '<div class="card ed" data-i="' + i + '">' +
+        '<div class="ed-head"><b>品项 ' + (i + 1) + '</b><div class="ed-actions">' + delBtns + "</div></div>" +
+        '<label class="fld"><span>名称</span><input class="inp" id="ed-name-' + i + '" data-f="name" value="' + esc(e.name) + '"></label>' +
+        '<div class="fld-row">' +
+        '<label class="fld"><span>分类</span><select class="inp" id="ed-group-' + i + '" data-f="group"><option value="main"' + (e.group === "main" ? " selected" : "") + '>主餐</option><option value="drink"' + (e.group === "drink" ? " selected" : "") + ">饮料</option></select></label>" +
+        '<label class="fld"><span>价格（元）</span><input class="inp" id="ed-price-' + i + '" data-f="priceText" inputmode="numeric" value="' + esc(e.priceText) + '"></label>' +
+        '<label class="fld"><span>单位</span><input class="inp" id="ed-unit-' + i + '" data-f="unit" value="' + esc(e.unit) + '"></label></div>' +
+        '<label class="fld"><span>选项名称（可留空，例如：辣度）</span><input class="inp" id="ed-optlabel-' + i + '" data-f="optLabel" value="' + esc(e.optLabel) + '"></label>' +
+        '<label class="fld"><span>选项内容（用顿号或逗号分开，第一个是预设）</span><input class="inp" id="ed-opts-' + i + '" data-f="optsText" value="' + esc(e.optsText) + '"></label>' +
+        '<label class="fld"><span>固定标示（可留空，例如：温）</span><input class="inp" id="ed-fixed-' + i + '" data-f="fixed" value="' + esc(e.fixed) + '"></label>' +
+        "</div>";
+    }).join("");
+  }
+  function collectItems() {
+    var items = [];
+    var seen = {};
+    for (var i = 0; i < editItems.length; i++) {
+      var e = editItems[i];
+      var name = e.name.trim();
+      if (!name) return "品项 " + (i + 1) + " 还没有名称。";
+      if (seen[name]) return "有两个品项都叫「" + name + "」，请改成不同的名称。";
+      seen[name] = true;
+      var ptxt = e.priceText.trim();
+      if (!/^\d{1,4}$/.test(ptxt)) return "「" + name + "」的价格要填 0 到 9999 的整数。";
+      var opts = [];
+      e.optsText.split(/[,，、;；\s]+/).forEach(function (v) {
+        v = v.trim();
+        if (v && opts.indexOf(v) < 0) opts.push(v);
+      });
+      if (opts.length > 12) return "「" + name + "」的选项太多了，最多 12 个。";
+      var id = e.id && /^[A-Za-z0-9_-]{1,40}$/.test(e.id) ? e.id : "i" + Date.now().toString(36) + i;
+      items.push({
+        id: id, group: e.group === "drink" ? "drink" : "main", name: name,
+        unit: e.unit.trim() || "份", price: Number(ptxt), fixed: e.fixed.trim(),
+        optLabel: opts.length ? (e.optLabel.trim() || "选项") : "", opts: opts
+      });
+    }
+    if (!items.length) return "至少要有一个品项。";
+    return items;
+  }
+  async function saveMenu() {
+    var notice = writeNotice();
+    if (!db || notice) { setMenuMsg(notice || "没有连上同步功能。", true); return; }
+    var res = collectItems();
+    if (typeof res === "string") { setMenuMsg(res, true); return; }
+    $("#ed-save").disabled = true;
+    try {
+      await db.doc("config/menu").set({ items: res, updatedAt: Date.now() });
+      edDirty = false;
+      applyMenu(res);
+      loadEditorFromMenu();
+      renderEditor();
+      setMenuMsg("已储存。点餐端的菜单会马上更新。", false);
+    } catch (e) {
+      setMenuMsg("储存失败，请检查网络后再按一次。", true);
+    }
+    $("#ed-save").disabled = false;
+  }
+
+  /* ---------- 管理者：重置今天 ---------- */
+  function renderReset() {
+    var box = $("#reset-box");
+    var today = dayKey();
+    var n = adminData && adminData.days[today] ? adminData.days[today].length : null;
+    if (resetBusy) { box.innerHTML = "<p>" + esc(resetMsg) + "</p>"; return; }
+    var info = "<p>会删除今天的所有订单（包含还在制作中的" + (n !== null ? "，目前 " + n + " 张" : "") + "）、让订单号码从 001 重新开始，并清除今天的售完标示。<b>删除后无法还原。</b>昨天以前的资料不受影响。</p>";
+    var act = resetAsk
+      ? '<p class="ask">确定要重置今天吗？</p><div class="ord-actions"><button type="button" id="reset-yes" class="btn-sm btn-danger" data-act="reset-yes">确定重置</button><button type="button" id="reset-no" class="btn-sm" data-act="reset-no">先不要</button></div>'
+      : '<div class="ord-actions"><button type="button" id="reset-go" class="btn-sm btn-danger" data-act="reset-ask">重置今天</button></div>';
+    box.innerHTML = info + act + (resetMsg ? '<p class="note">' + esc(resetMsg) + "</p>" : "");
+  }
+  async function resetToday() {
+    var notice = writeNotice();
+    if (!db || notice) { resetMsg = notice || "没有连上同步功能。"; resetAsk = false; renderReset(); return; }
+    resetBusy = true; resetAsk = false; resetMsg = "正在清除今天的订单…"; renderReset();
+    var today = dayKey();
+    try {
+      var snap = await db.collection("orders").where("day", "==", today).get();
+      var total = snap.docs.length;
+      for (var i = 0; i < total; i++) {
+        await db.doc("orders/" + snap.docs[i].id).delete();
+        if (i % 5 === 4 || i === total - 1) { resetMsg = "已删除 " + (i + 1) + " / " + total + " 张订单…"; renderReset(); }
+      }
+      await db.doc("meta/counter-" + today).delete();
+      var sold = await db.collection("soldout").get();
+      for (var j = 0; j < sold.docs.length; j++) await db.doc("soldout/" + sold.docs[j].id).delete();
+      resetMsg = "今天已重置：删除了 " + total + " 张订单，订单号码会从 001 重新开始，售完标示也清除了。";
+    } catch (e) {
+      resetMsg = "重置到一半失败了，请再按一次「重置今天」把剩下的清掉。";
+    }
+    resetBusy = false;
+    renderReset();
+    loadAdmin();
+  }
+
+  /* ---------- 路由 ---------- */
+  function route() {
+    var h = location.hash.replace("#", "");
+    currentView = h === "order" ? "order" : h === "kitchen" ? "kitchen" : h === "admin" ? "admin" : "home";
+    if (currentView !== "admin") { adminUnlocked = false; resetAsk = false; edDelAsk = -1; }
+    $("#v-home").hidden = currentView !== "home";
+    $("#v-order").hidden = currentView !== "order";
+    $("#v-kitchen").hidden = currentView !== "kitchen";
+    $("#v-admin").hidden = currentView !== "admin";
+    $("#sheet").hidden = true;
+    sheetView = "cart";
+    $("#toast").hidden = true;
+    updateBar();
+    if (currentView === "order") refreshOrderStatus();
+    if (currentView === "kitchen") startKitchen();
+    if (currentView === "admin") applyAdminGate();
+    window.scrollTo(0, 0);
+  }
+
+  /* ---------- 事件 ---------- */
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("[data-act]");
+    if (!t) return;
+    var act = t.getAttribute("data-act");
+    var card = t.closest(".item");
+    var id = card ? card.getAttribute("data-item") : null;
+    var ix = Number(t.getAttribute("data-i"));
+
+    if (act === "pick") {
+      draft[id].opts[t.getAttribute("data-group")] = t.getAttribute("data-value");
+      Array.prototype.forEach.call(t.parentNode.children, function (c) {
+        c.setAttribute("aria-checked", c === t ? "true" : "false");
+      });
+    } else if (act === "q-dec") {
+      draft[id].qty = Math.max(1, draft[id].qty - 1); setQtyText(id);
+    } else if (act === "q-inc") {
+      draft[id].qty = Math.min(20, draft[id].qty + 1); setQtyText(id);
+    } else if (act === "add") {
+      if (isSold(id)) return;
+      var it = byId[id];
+      var opts = it.groups.map(function (g) { return draft[id].opts[g.key]; });
+      if (it.fixed) opts.push(it.fixed);
+      var text = opts.join(" · ");
+      var qty = draft[id].qty;
+      var hit = cart.filter(function (l) { return l.itemId === id && l.text === text; })[0];
+      if (hit) hit.qty += qty; else cart.push({ itemId: id, opts: opts, text: text, qty: qty });
+      draft[id].qty = 1; setQtyText(id);
+      updateBar();
+      showToast("已加入 " + it.name + " × " + qty, false, true);
+    } else if (act === "sold-toggle") {
+      toggleSold(t.getAttribute("data-id") || id);
+    } else if (act === "open") {
+      openSheet("cart");
+    } else if (act === "orders-open") {
+      openSheet("orders");
+    } else if (act === "close") {
+      closeSheet();
+    } else if (act === "cut" || act === "bag" || act === "dine") {
+      var val = t.getAttribute("data-value");
+      if (act === "cut") cutlery = val; else if (act === "bag") bag = val; else dine = val;
+      Array.prototype.forEach.call(t.parentNode.children, function (c) {
+        c.setAttribute("aria-checked", c === t ? "true" : "false");
+      });
+    } else if (act === "l-dec" || act === "l-inc") {
+      cart[ix].qty += act === "l-inc" ? 1 : -1;
+      if (cart[ix].qty < 1) cart.splice(ix, 1);
+      sendError = "";
+      updateBar(); renderSheet();
+    } else if (act === "send") {
+      submitOrder();
+    } else if (act === "again") {
+      closeSheet();
+      window.scrollTo(0, 0);
+    } else if (act === "ord-edit") {
+      startEdit(t.getAttribute("data-oid"));
+    } else if (act === "ord-cancel") {
+      cancelAsk = t.getAttribute("data-oid"); renderSheet();
+    } else if (act === "cancel-no") {
+      cancelAsk = null; renderSheet();
+    } else if (act === "cancel-yes") {
+      cancelOrder(t.getAttribute("data-oid"));
+    } else if (act === "edit-cancel") {
+      cancelEdit();
+    } else if (act === "done") {
+      markDone(t.getAttribute("data-id"));
+    } else if (act === "undo") {
+      undoDone();
+    } else if (act === "admin-tab") {
+      adminTab = t.getAttribute("data-value");
+      showAdminTab();
+    } else if (act === "admin-lock") {
+      adminUnlocked = false; resetAsk = false; edDelAsk = -1;
+      applyAdminGate();
+    } else if (act === "admin-range") {
+      adminRange = t.getAttribute("data-value");
+      renderAdmin();
+    } else if (act === "admin-refresh") {
+      loadAdmin();
+    } else if (act === "ed-add") {
+      editItems.push({ id: "", group: "main", name: "", unit: "份", priceText: "", optLabel: "", optsText: "", fixed: "" });
+      edDirty = true; edDelAsk = -1;
+      renderEditor();
+      setMenuMsg("有修改还没储存。", false);
+      var nameEl = $("#ed-name-" + (editItems.length - 1));
+      if (nameEl) nameEl.focus();
+    } else if (act === "ed-up" || act === "ed-down") {
+      var to = act === "ed-up" ? ix - 1 : ix + 1;
+      if (to >= 0 && to < editItems.length) {
+        var tmp = editItems[ix]; editItems[ix] = editItems[to]; editItems[to] = tmp;
+        edDirty = true; edDelAsk = -1; renderEditor();
+        setMenuMsg("有修改还没储存。", false);
+      }
+    } else if (act === "ed-del") {
+      edDelAsk = ix; renderEditor();
+    } else if (act === "ed-del-no") {
+      edDelAsk = -1; renderEditor();
+    } else if (act === "ed-del-yes") {
+      editItems.splice(ix, 1);
+      edDirty = true; edDelAsk = -1; renderEditor();
+      setMenuMsg("有修改还没储存。", false);
+    } else if (act === "ed-save") {
+      saveMenu();
+    } else if (act === "reset-ask") {
+      resetAsk = true; resetMsg = ""; renderReset();
+    } else if (act === "reset-no") {
+      resetAsk = false; renderReset();
+    } else if (act === "reset-yes") {
+      resetToday();
+    } else if (act === "sound") {
+      toggleSound();
+    }
+  });
+  document.addEventListener("input", function (e) {
+    var t = e.target;
+    var f = t && t.getAttribute ? t.getAttribute("data-f") : null;
+    if (!f) return;
+    var card = t.closest(".ed");
+    if (!card) return;
+    var i = Number(card.getAttribute("data-i"));
+    if (!editItems[i]) return;
+    editItems[i][f] = t.value;
+    if (!edDirty) setMenuMsg("有修改还没储存。", false);
+    edDirty = true;
+  });
+  document.addEventListener("submit", function (e) {
+    if (!e.target || e.target.id !== "admin-login") return;
+    e.preventDefault();
+    var pw = $("#admin-pw").value.trim();
+    $("#admin-pw").value = "";
+    if (pw === ADMIN_PASSWORD) {
+      adminUnlocked = true;
+      $("#admin-pw-err").hidden = true;
+      applyAdminGate();
+      loadAdmin();
+      loadEditorFromMenu();
+      if (adminTab === "menu") renderEditor();
+    } else {
+      $("#admin-pw-err").hidden = false;
+    }
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !$("#sheet").hidden) closeSheet();
+  });
+  window.addEventListener("hashchange", route);
+
+  /* ---------- 启动 ---------- */
+  applyMenu(DEFAULT_ITEMS, true);
+  renderMenu();
+  renderSoldPanel();
+  renderKitchen();
+  route();
+  setInterval(updateWaits, 20000);
+
+  function finishInit() {
+    ready = true;
+    startShared();
+    applySoldState();
+    renderSoldPanel();
+    if (currentView === "order") refreshOrderStatus();
+    if (currentView === "kitchen") { startKitchen(); renderKitchen(); }
+    if (currentView === "admin") applyAdminGate();
+  }
+  /* 把 Firebase 包成和原本 db 相同的接口，页面其余程序不用改。 */
+  function makeDb(fdb) {
+    function snapOf(s) {
+      return { exists: s.exists, id: s.id, data: function () { return s.data(); }, metadata: s.metadata };
+    }
+    function listOf(s) {
+      return {
+        docs: s.docs.map(function (d) { return { id: d.id, data: function () { return d.data(); } }; }),
+        metadata: s.metadata,
+        docChanges: function () {
+          return s.docChanges().map(function (c) {
+            return { type: c.type, doc: { id: c.doc.id, data: function () { return c.doc.data(); } } };
+          });
+        }
+      };
+    }
+    function queryOf(q) {
+      return {
+        where: function (f, op, v) { return queryOf(q.where(f, op, v)); },
+        limit: function (n) { return queryOf(q.limit(n)); },
+        get: function () { return q.get().then(listOf); },
+        onSnapshot: function (ok, err) { return q.onSnapshot(function (s) { ok(listOf(s)); }, err); }
+      };
+    }
+    function docOf(path) {
+      var ref = fdb.doc(path);
+      return {
+        get: function () { return ref.get().then(snapOf); },
+        set: function (v) { return ref.set(v); },
+        update: function (v) { return ref.update(v); },
+        delete: function () { return ref.delete(); },
+        onSnapshot: function (ok, err) { return ref.onSnapshot(function (s) { ok(snapOf(s)); }, err); },
+        acquire: function (opt) {
+          var now = Date.now();
+          var ttl = (opt && opt.ttlMs) || 1000;
+          var holder = opt && opt.holder;
+          return fdb.runTransaction(function (tx) {
+            return tx.get(ref).then(function (s) {
+              var d = s.exists ? s.data() : {};
+              if (d.lockHolder && d.lockHolder !== holder && d.lockUntil > now) return { acquired: false };
+              tx.set(ref, { lockHolder: holder, lockUntil: now + ttl }, { merge: true });
+              return { acquired: true };
+            });
+          });
+        }
+      };
+    }
+    return {
+      doc: docOf,
+      collection: function (path) {
+        var api = queryOf(fdb.collection(path));
+        api.doc = function (k) { return docOf(path + "/" + k); };
+        return api;
+      }
+    };
+  }
+
+  function startApp() {
+    var cfg = FIREBASE_CONFIG || {};
+    var configured = cfg.apiKey && cfg.apiKey.indexOf("PASTE") !== 0 && window.firebase;
+    if (configured) {
+      try {
+        if (!firebase.apps.length) firebase.initializeApp(cfg);
+        db = makeDb(firebase.firestore());
+        canWrite = true;
+      } catch (e) {
+        db = null;
+      }
+    }
+    finishInit();
+  }
+
+  function checkGate() {
+    var ok = false;
+    try { ok = localStorage.getItem("xlbShopOK") === "1"; } catch (e) {}
+    if (ok) { startApp(); return; }
+    $("#gate").hidden = false;
+    $("#gate-form").addEventListener("submit", function (e) {
+      e.preventDefault();
+      if ($("#gate-pw").value.trim() === SHOP_PASSWORD) {
+        try { localStorage.setItem("xlbShopOK", "1"); } catch (err) {}
+        $("#gate").hidden = true;
+        $("#gate-err").hidden = true;
+        startApp();
+      } else {
+        $("#gate-err").hidden = false;
+        $("#gate-pw").value = "";
+      }
+    });
+  }
+  checkGate();
+})();
+</script>
