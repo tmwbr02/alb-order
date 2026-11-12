@@ -7,13 +7,13 @@
 |---|---|
 | `index.html`（= `xlb-standalone.html`） | 整个程式，单一文件。放到 GitHub Pages 就能用，也可「加入主画面」当 App 用（PWA）。 |
 | `manifest.json`、`sw.js`、`icon-*.png` | 让它能安装成 App（PWA）。 |
-| `firestore.rules` | 建议贴到 Firebase 的 Firestore 规则（多店家版）。 |
+| `firestore.rules` | Firestore 安全规则：员工设备与客人分开授权（需要先开启 Firebase 匿名登录）。 |
 | `host/` | 「电脑当主机」版：没有外网时，电脑 + 店内 WiFi 就能用（见 `host/使用说明.txt`）。 |
 
 ## 上线步骤（GitHub Pages）
 1. 仓库 **Settings → Pages**，Source 选 `main` 分支、`/ (root)`，储存。
 2. 约 1 分钟后网址是 `https://<你的帐号>.github.io/alb-order/`。
-3. 在 Firebase 控制台 → Firestore → 规则，贴上 `firestore.rules` 的内容并发布。
+3. 在 Firebase 控制台 → Authentication → 登录方式，开启「匿名」。**先做这一步**，再到 Firestore → 规则，贴上 `firestore.rules` 的内容并发布。
 
 ## 多家店怎么互不冲突
 - 第一次打开会出现「店家登入」：**新店家**输入店名与管理者密码（4–12 个数字），系统产生一组 8 位**店家代码**。
@@ -32,6 +32,8 @@
 管理者 →「店家设置」→ 店家风格：12 生肖、星辰、月光、海洋、樱花、咖啡、和风、夜市霓虹。
 
 ## 注意
-- Firestore 规则目前是「知道店家代码就能读写」，适合小店；若要更严格的安全性，需要再加 Firebase 登入（Auth）。
+- 安全：每台设备用 Firebase 匿名登录取得自己的身份。员工设备要输入完整店家代码（`店码-6 码加入码`）才会登记到 `stores/<店>/staff/`，之后可读写这家店的全部资料。客人的 QR 码只含店码，只能看菜单与出餐进度、送出自己的点单、修改或取消自己还没做的单；读不到管理密码，也改不了菜单、设置和别人的单。
+- 仍有的限制：客人端在技术上读得到当天的订单内容（排号需要）；管理者密码只挡画面，员工设备之间互相信任；最早的单店资料（根路径）只要求已登录。
+- 断网：每台设备都在本机保存一份资料。某台断网时仍可点餐、出餐，连上后自动同步；断网期间它看不到别台的新单。
 - Firebase 设定在 `index.html` 里的 `FIREBASE_CONFIG`；要让每家店用自己的 Firebase，改成自己的设定即可。
 - 旧版单店使用者：登入画面输入原本的店内密码即可继续用原来的资料。

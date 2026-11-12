@@ -1,15 +1,80 @@
 rules_version = '2';
+// 摊车订单 —— 安全规则（需要先在 Firebase 控制台开启「匿名」登录）
+// 员工设备：stores/<店>/staff/<uid> 存在的设备，可读写这家店的全部资料。
+// 客人（扫 QR 码）：只能看菜单与店家设置、看订单进度、新增自己的点单、修改或取消自己还没做的单。
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 多店家版：每家店的资料都在 stores/{店家代码}/ 底下。
-    // 店家代码是 8 位随机码，等于这家店的「钥匙」：知道代码的人才进得去。
-    match /stores/{store}/{document=**} {
-      allow read, write: if true;
+    function signedIn() { return request.auth != null; }
+    function isStaff(store) {
+      return signedIn() && exists(/databases/$(database)/documents/stores/$(store)/staff/$(request.auth.uid));
     }
-    // 旧版（单店、以前的店内密码）使用的路径；没有旧资料可以删掉这一段。
-    match /config/{d}       { allow read, write: if true; }
-    match /orders/{d}       { allow read, write: if true; }
-    match /soldout/{d}      { allow read, write: if true; }
-    match /meta/{d}         { allow read, write: if true; }
+    function hasKey(store) {
+      return exists(/databases/$(database)/documents/stores/$(store)/secret/join);
+    }
+    function keyOf(store) {
+      return get(/databases/$(database)/documents/stores/$(store)/secret/join).data.key;
+    }
+    function guestOrderNew() {
+      let d = request.resource.data;
+      return d.uid == request.auth.uid
+        && d.status == 'pending'
+        && d.src in ['customer', 'queue']
+        && d.lines is list && d.lines.size() > 0 && d.lines.size() <= 80
+        && d.total is number && d.total >= 0
+        && d.no is number && d.shown is number
+        && d.day is string && d.createdAt is number
+        && !('payStatus' in d) && !('doneAt' in d) && !('paidAt' in d);
+    }
+    function guestOrderEdit() {
+      return resource.data.uid == request.auth.uid
+        && resource.data.status == 'pending'
+        && request.resource.data.status in ['pending', 'cancelled']
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+             ['lines', 'total', 'cutlery', 'bag', 'dine', 'pickupAt', 'phoneTail', 'rush', 'editedAt', 'status', 'cancelledAt'])
+        && request.resource.data.lines is list && request.resource.data.lines.size() <= 80;
+    }
+    function counterOk() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['n', 'lockHolder', 'lockUntil'])
+        && (!('n' in d) || (d.n is number && d.n >= 0 && d.n <= 100000));
+    }
+
+    match /stores/{store} {
+      // 员工名单：只有知道「员工加入码」的设备才能把自己加进来
+      match /staff/{uid} {
+        allow get: if signedIn() && (request.auth.uid == uid || isStaff(store));
+        allow list, delete: if isStaff(store);
+        allow create, update: if signedIn() && request.auth.uid == uid
+          && (!hasKey(store) || request.resource.data.key == keyOf(store));
+      }
+      match /secret/{d} {
+        allow read, write: if isStaff(store);
+      }
+      match /config/{d} {
+        allow read: if signedIn() && (d == 'shop' || d == 'menu' || isStaff(store));
+        allow write: if isStaff(store);
+      }
+      match /soldout/{d} {
+        allow read: if signedIn();
+        allow write: if isStaff(store);
+      }
+      match /meta/{d} {
+        allow read: if signedIn();
+        allow create, update: if signedIn() && (counterOk() || isStaff(store));
+        allow delete: if isStaff(store);
+      }
+      match /orders/{d} {
+        allow read: if signedIn();
+        allow create: if signedIn() && (guestOrderNew() || isStaff(store));
+        allow update: if signedIn() && (guestOrderEdit() || isStaff(store));
+        allow delete: if isStaff(store);
+      }
+    }
+
+    // 旧的单店资料（没有店家代码的最早版本）：只要求已登录
+    match /config/{d}  { allow read, write: if signedIn(); }
+    match /orders/{d}  { allow read, write: if signedIn(); }
+    match /soldout/{d} { allow read, write: if signedIn(); }
+    match /meta/{d}    { allow read, write: if signedIn(); }
   }
 }
