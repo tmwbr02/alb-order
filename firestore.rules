@@ -1,0 +1,15 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 多店家版：每家店的资料都在 stores/{店家代码}/ 底下。
+    // 店家代码是 8 位随机码，等于这家店的「钥匙」：知道代码的人才进得去。
+    match /stores/{store}/{document=**} {
+      allow read, write: if true;
+    }
+    // 旧版（单店、以前的店内密码）使用的路径；没有旧资料可以删掉这一段。
+    match /config/{d}       { allow read, write: if true; }
+    match /orders/{d}       { allow read, write: if true; }
+    match /soldout/{d}      { allow read, write: if true; }
+    match /meta/{d}         { allow read, write: if true; }
+  }
+}
