@@ -152,7 +152,7 @@ var server = http.createServer(function (req, res) {
     if (!h) { res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" }); res.end("找不到 index.html，请把它放在 server.js 同一个资料夹。"); return; }
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" }); res.end(h); return;
   }
-  if (u === "/info") { res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }); res.end(JSON.stringify({ app: "xlb", port: PORT })); return; }
+  if (u === "/info") { res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }); res.end(JSON.stringify({ app: "xlb", port: PORT, ips: ips() })); return; }
   if (u === "/backup.json") {
     res.writeHead(200, { "Content-Type": "application/json", "Content-Disposition": "attachment; filename=order-backup.json" });
     res.end(JSON.stringify({ app: "xlb", at: Date.now(), data: data })); return;

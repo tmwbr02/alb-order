@@ -3749,10 +3749,22 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   function lanUid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
   function jclone(v) { return v === undefined ? v : JSON.parse(JSON.stringify(v)); }
   function lanLoadData() { try { lanData = JSON.parse(localStorage.getItem("xlb-lan-data") || "{}") || {}; } catch (e) { lanData = {}; } }
+  var lanSaveBad = false;
+  function lanSaveNow() {
+    clearTimeout(lanSaveT);
+    var was = lanSaveBad;
+    try { localStorage.setItem("xlb-lan-data", JSON.stringify(lanData)); lanSaveBad = false; } catch (e) { lanSaveBad = true; }
+    if (was !== lanSaveBad) lanBanner();
+  }
   function lanSaveSoon() {
     clearTimeout(lanSaveT);
-    lanSaveT = setTimeout(function () { try { localStorage.setItem("xlb-lan-data", JSON.stringify(lanData)); } catch (e) {} }, 300);
+    lanSaveT = setTimeout(lanSaveNow, 300);
   }
+  /* 浏览器配对模式（没有本地主机程序）：客人的手机连不到这台主机 */
+  function pairOnly() { return netCfg.mode === "lan" && !wsMode(); }
+  var PAIR_QR_NOTE = "目前是「浏览器配对」的 WiFi 本地模式，客人的手机连不到这台主机，扫码点的单你们会收不到，所以这里不产生 QR 码。要让客人扫码点单，请到「连线设定」改用网络模式，或改用「电脑当主机」。";
+  var SRV_QR_NOTE = "客人的手机要先连上店里的 WiFi，才打得开这个 QR 码。建议在旁边贴上 WiFi 名称和密码。";
+  var srvIp = "";
   function wOk(d, w) {
     for (var i = 0; i < w.length; i++) {
       var c = w[i], v = d[c[0]], x = c[2];
@@ -4205,7 +4217,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     canWrite = true;
     lanConn.state = "reconnecting";
     finishInit();
-    if (SRV) wsOpen("ws://" + location.host + "/ws", wsDown);
+    if (SRV) {
+      wsOpen("ws://" + location.host + "/ws", wsDown);
+      try {
+        fetch("/info").then(function (r) { return r.json(); }).then(function (j) {
+          if (j && j.ips && j.ips[0]) { srvIp = String(j.ips[0]); if (currentView === "qr") renderQr(); if (currentView === "admin" && adminUnlocked) renderTablesForm(); }
+        }).catch(function () {});
+      } catch (e) {}
+    }
     else if (netCfg.role === "host") startNativeHost();
     else findHost();
     lanBanner(); updateNetStatus();
@@ -4218,8 +4237,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   function lanBanner() {
     var b = $("#lan-banner"); if (!b) return;
     var down = wsMode() && lanConn.state !== "connected";
-    b.hidden = !down;
+    b.hidden = !down && !lanSaveBad;
     if (down) b.textContent = netCfg.role === "host" && !SRV ? "主机启动中…" : "正在连线主机…请确认主机手机开着，并且连在同一个 WiFi。";
+    else if (lanSaveBad) b.textContent = "这台主机的储存空间满了，新的订单没有存下来！请先到「连线设定」备份，再到「管理」清掉旧订单。";
   }
   /* ---- 界面 ---- */
   function netSay(msg, bad) { netUi.msg = msg; netUi.bad = !!bad; renderNet(); }
@@ -4450,6 +4470,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (netCfg.role === "host") {
       lanLoadData();
       db = lanDbFrom(hubExec);
+      /* 画面被切到背景或关掉前，马上把资料存好；还有设备连着时，关页面前先问一次 */
+      window.addEventListener("pagehide", lanSaveNow);
+      document.addEventListener("visibilitychange", function () { if (document.visibilityState === "hidden") lanSaveNow(); });
+      window.addEventListener("beforeunload", function (e) { lanSaveNow(); if (connectedPeers().length) { e.preventDefault(); e.returnValue = ""; } });
       try { if (navigator.wakeLock) { var wl = function () { navigator.wakeLock.request("screen").catch(function () {}); }; wl(); document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") wl(); }); } } catch (e) {}
     } else {
       db = lanDbFrom(clientExec);
@@ -4894,14 +4918,14 @@ var TW_CHARS = "与丑专业丝两个为丽么乌乐习于产仅从们价会传�
   }
   function defaultCustBase() {
     var u = String(location.href).replace(/#.*$/, "");
-    if (SRV) return location.origin + "/";
+    if (SRV) return (/^(localhost|127\.|\[::1\])/.test(location.hostname) && srvIp ? "http://" + srvIp + (location.port ? ":" + location.port : "") : location.origin) + "/";
     try { var h = wsS.hostInfo; if (h && h.ips && h.ips.length) return "http://" + h.ips[0] + ":" + (h.port || 8080) + "/"; } catch (e) {}
     return custUrlBad(u) ? PUBLIC_URL : u;
   }
   /* 客人手机打不开的网址：Claude 的链接（要登入）、本机文件等 */
   function custUrlBad(u) {
     u = String(u || "");
-    return !/^https?:\/\/\S+$/i.test(u) || /claude\.(ai|com)|claudeusercontent|anthropic/i.test(u);
+    return !/^https?:\/\/\S+$/i.test(u) || /claude\.(ai|com)|claudeusercontent|anthropic/i.test(u) || /^https?:\/\/(localhost|127\.|\[::1\])/i.test(u);
   }
   /* 目前要印在 QR 码上的网址：以前存下的若是客人打不开的（例如 Claude 链接），自动改用公开网址 */
   function custBase() {
@@ -4922,7 +4946,9 @@ var TW_CHARS = "与丑专业丝两个为丽么乌乐习于产仅从们价会传�
     var m = $("#tb-msg"); m.hidden = true;
     if (!u.value || custUrlBad(u.value.trim())) u.value = custBase();
     if (MODE_CLAUDE) { m.textContent = CLAUDE_QR_NOTE; m.className = "note"; m.hidden = false; }
+    if (SRV) { m.textContent = SRV_QR_NOTE; m.className = "note"; m.hidden = false; }
     updateAcceptUi();
+    if (pairOnly()) { m.textContent = PAIR_QR_NOTE; m.className = "err"; m.hidden = false; $("#tb-queue").innerHTML = ""; return; }
     var bu = $("#tb-board"); if (bu) bu.value = u.value.replace(/#.*$/, "") + "#board/s-" + (storeId || "-");
     if (/^https?:\/\/\S+$/i.test(u.value)) $("#tb-queue").innerHTML = tableCards(u.value.trim().replace(/#.*$/, ""), [0]);
   }
@@ -4938,10 +4964,11 @@ var TW_CHARS = "与丑专业丝两个为丽么乌乐习于产仅从们价会传�
       if (keep) sel.value = keep;
     }
     var base = custBase();
-    var bad = custUrlBad(base);
+    var bad = custUrlBad(base) || pairOnly();
     var w = $("#qr-warn");
-    w.hidden = !bad && !MODE_CLAUDE;
-    w.textContent = bad ? "目前的网址客人手机可能打不开。请到「管理 → 客人扫码点餐」把「客人打开的网址」改成客人能打开的网址。" : MODE_CLAUDE ? CLAUDE_QR_NOTE : "";
+    w.hidden = !bad && !MODE_CLAUDE && !SRV;
+    w.className = pairOnly() ? "err" : "note";
+    w.textContent = pairOnly() ? PAIR_QR_NOTE : bad ? "目前的网址客人手机可能打不开。请到「管理 → 客人扫码点餐」把「客人打开的网址」改成客人能打开的网址。" : MODE_CLAUDE ? CLAUDE_QR_NOTE : SRV ? SRV_QR_NOTE : "";
     var kind = Number(sel.value) || 0;
     var url = custUrl(base, kind);
     $("#qr-big").innerHTML = bad ? "" : '<div class="tb-card"><b>' + (kind ? "桌号 " + kind : "排队点餐") + "</b>" + qrSvg(url) + "<small>" + esc(url) + "</small></div>";
@@ -4957,6 +4984,7 @@ var TW_CHARS = "与丑专业丝两个为丽么乌乐习于产仅从们价会传�
   }
   function tbBase() {
     var m = $("#tb-msg");
+    if (pairOnly()) { m.textContent = PAIR_QR_NOTE; m.className = "err"; m.hidden = false; return ""; }
     var base = $("#tb-url").value.trim().replace(/#.*$/, "");
     if (/claude\.(ai|com)|claudeusercontent|anthropic/i.test(base)) { base = PUBLIC_URL; $("#tb-url").value = base; }
     if (!/^https?:\/\/[^\s]+$/i.test(base)) { m.textContent = "网址要以 http:// 或 https:// 开头。"; m.className = "err"; m.hidden = false; return ""; }
