@@ -1835,6 +1835,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
   }
   async function nextNumberOnline() {
+    if (db.nextNo) return db.nextNo("meta/counter-" + dayKey(), localMaxNo());
     var ref = db.doc("meta/counter-" + dayKey());
     for (var i = 0; i < 8; i++) {
       var r = await ref.acquire({ holder: holderId, ttlMs: 1000 });
@@ -1848,6 +1849,20 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       await sleep(400);
     }
     throw new Error("busy");
+  }
+  var saveChain = Promise.resolve();
+  function saveFailed(id, shownNo, b, why) {
+    myIds = myIds.filter(function (x) { return x !== id; }); saveMyIds(); renderCustMine();
+    var msg = why + "取餐号码 " + pad(shownNo) + " 的单子没有送出去，请检查网络后重新送出。";
+    if (lastOrder && lastOrder.id === id) lastOrder = null;
+    if (!cart.length && !editingId && !sending) {
+      cart = b.cart; cutlery = b.cutlery; bag = b.bag; dine = b.dine;
+      pickupMode = b.pickupMode; pickupCustom = b.pickupCustom; pickupKeep = b.pickupKeep; phoneTail = b.phoneTail; rush = b.rush;
+      sheetView = "cart"; sendError = msg;
+      updateBar(); renderSheet(); $("#sheet").hidden = false;
+    } else {
+      showToast(msg, false, true, 9000);
+    }
   }
   async function submitOrder() {
     if (sending || !cart.length || !db || writeNotice()) return;
@@ -1883,11 +1898,23 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         lastOrder = { no: editingNo, lines: lines, total: orderTotal, cutlery: cutlery, bag: bag, dine: dine, pickupAt: pickupAt, phoneTail: tail, rush: rushNow, edited: true };
         editingId = null; editingNo = 0;
       } else {
-        var no = await nextNumber(); var shownNo = pickShown();
+        /* 先让客人看到取餐号码，订单在背景存档：取号、写入不再让人干等。存档失败时会把单子放回购物车。 */
+        var shownNo = pickShown();
         var id = "o" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-        await db.doc("orders/" + id).set(Object.assign({ no: no, shown: shownNo, day: dayKey(), createdAt: Date.now(), status: "pending", total: orderTotal, cutlery: cutlery, bag: bag, dine: dine, pickupAt: pickupAt, phoneTail: tail, rush: rushNow, lines: lines }, authUid ? { uid: authUid } : {}, cu ? { dine: custTable ? "内用" : "外带", cutlery: "要餐具", bag: custTable ? "不要塑胶袋" : "要塑胶袋", table: custTable || 0, src: custTable ? "customer" : "queue" } : {}));
-        lastOrder = { id: id, table: cu ? (custTable || 0) : 0, shown: shownNo, no: no, lines: lines, total: orderTotal, cutlery: cutlery, bag: bag, dine: dine, pickupAt: pickupAt, phoneTail: tail, rush: rushNow, edited: false };
+        var createdAt = Date.now();
+        var backup = { cart: cart, cutlery: cutlery, bag: bag, dine: dine, pickupMode: pickupMode, pickupCustom: pickupCustom, pickupKeep: pickupKeep, phoneTail: phoneTail, rush: rush };
+        var tableNow = custTable;
+        lastOrder = { id: id, table: cu ? (custTable || 0) : 0, shown: shownNo, no: 0, lines: lines, total: orderTotal, cutlery: cutlery, bag: bag, dine: dine, pickupAt: pickupAt, phoneTail: tail, rush: rushNow, edited: false };
         if (cu) { myIds.push(id); saveMyIds(); renderCustMine(); }
+        saveChain = saveChain.then(async function () {
+          try {
+            var no = await nextNumber();
+            await db.doc("orders/" + id).set(Object.assign({ no: no, shown: shownNo, day: dayKey(), createdAt: createdAt, status: "pending", total: orderTotal, cutlery: cutlery, bag: bag, dine: dine, pickupAt: pickupAt, phoneTail: tail, rush: rushNow, lines: lines }, authUid ? { uid: authUid } : {}, cu ? { dine: tableNow ? "内用" : "外带", cutlery: "要餐具", bag: tableNow ? "不要塑胶袋" : "要塑胶袋", table: tableNow || 0, src: tableNow ? "customer" : "queue" } : {}));
+            if (lastOrder && lastOrder.id === id) { lastOrder.no = no; if (!shownNo && sheetView === "done") renderSheet(); }
+          } catch (e2) {
+            saveFailed(id, shownNo, backup, e2 && e2.message === "busy" ? "现在太多人同时送单，" : "");
+          }
+        });
       }
       cart = [];
       cutlery = "要餐具";
@@ -3474,6 +3501,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
     return {
       doc: docOf,
+      nextNo: function (path, floor) {
+        var ref = fdb.doc(pre + path);
+        return fdb.runTransaction(function (tx) {
+          return tx.get(ref).then(function (s) {
+            var cur = s.exists ? Number(s.data().n) || 0 : 0;
+            var n = Math.max(cur, floor || 0) + 1;
+            tx.set(ref, { n: n });
+            return n;
+          });
+        });
+      },
       collection: function (path) {
         var api = queryOf(fdb.collection(pre + path));
         api.doc = function (k) { return docOf(path + "/" + k); };
