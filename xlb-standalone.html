@@ -310,6 +310,15 @@ h2::after { content: ""; flex: 1; height: 2px; background: var(--line); }
 .due b { font-family: var(--font-display); font-size: 40px; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .payother { width: 100%; min-height: 52px; }
 .change { margin: 0; padding: 12px 16px; border-radius: 14px; background: var(--warn-soft); color: var(--warn); font-family: var(--font-display); font-size: 34px; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
+.qpay { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px; border-radius: 16px; border: 3px solid var(--accent); background: #fff; color: #111; }
+.qpay .qrbox { width: min(100%, 300px); }
+.qpay-amt { margin: 0; font-size: 20px; text-align: center; }
+.qpay-amt b { font-family: var(--font-display); font-size: 36px; color: #b3261e; }
+.qpay .keeplist { color: #333; font-size: 16px; align-self: stretch; }
+.qrow { display: flex; gap: 14px; align-items: center; }
+.qrow-qr { width: 120px; flex: none; }
+.qrow-qr .qrbox { width: 100%; margin: 0; }
+.qr-up { display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .change.short { background: var(--chili); color: var(--on-chili); }
 .fixrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 0; border-top: 2px solid var(--line); font-size: 18px; font-variant-numeric: tabular-nums; }
 .fixrow > span { flex: 1 1 200px; }
@@ -362,6 +371,18 @@ h2::after { content: ""; flex: 1; height: 2px; background: var(--line); }
 body.bar-on .toast, body.bar-on .toast.high { bottom: calc(104px + env(safe-area-inset-bottom, 0px)); }
 
 .langbox { display: inline-flex; align-items: center; gap: 6px; margin-inline-start: auto; }
+.keepbtn { min-height: 44px; padding: 0 14px; border-radius: 12px; border: 2px solid var(--line); background: transparent; color: inherit; font-size: 16px; font-weight: 700; white-space: nowrap; }
+.keepbtn.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.keepbtn.big { min-height: 64px; width: 100%; font-size: 22px; }
+.keepinfo { min-width: 44px; min-height: 44px; padding: 0; border-radius: 50%; border: 2px solid var(--line); background: transparent; color: inherit; font-size: 18px; font-weight: 700; }
+.keeprow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.keepchk { display: flex; align-items: center; gap: 10px; font-size: 18px; }
+.keepchk input { width: 26px; height: 26px; }
+.keeplist { margin: 0; padding-inline-start: 22px; display: flex; flex-direction: column; gap: 8px; font-size: 17px; }
+#keep h3 { margin: 4px 0 0; font-size: 20px; }
+#keep-banner { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(24px + env(safe-area-inset-bottom, 0px)); z-index: 40; min-height: 52px; padding: 0 22px; border: 0; border-radius: 99px; background: var(--chili); color: var(--on-chili); font-size: 18px; font-weight: 700; box-shadow: 0 6px 20px rgba(0,0,0,.3); }
+.bmeta .keepbtn, .bmeta .keepinfo { color: #fff; background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.35); }
+.bmeta .keepbtn.on { background: #1f7a5a; border-color: #8fe0c0; }
 .langsel, .langsel2 { min-height: 44px; font-size: 16px; padding: 0 8px; border-radius: 10px; border: 2px solid var(--line, #ccc); background: #fff; color: inherit; max-width: 150px; }
 [dir="rtl"] .back { display: inline-block; }
 #rg-from, #rg-to { min-width: 0; font-size: 15px; padding-left: 8px; padding-right: 4px; }
@@ -383,6 +404,8 @@ html:not([lang^="zh"]):not([lang="ja"]) .tile strong, html:not([lang^="zh"]):not
 .custmine .cm-st { font-weight: 700; padding: 6px 12px; border-radius: 999px; background: #f3e7c9; color: #7a4b00; }
 .custmine .cm-st.ready { background: #1f7a5a; color: #fff; }
 .custmine .cm-st.cancel { background: #eee; color: #666; }
+.custmine .cm-row { flex-wrap: wrap; }
+.custmine .cm-eta { flex-basis: 100%; font-size: 17px; font-weight: 700; color: #1f5f99; }
 #v-cust .tiles { display: flex; flex-direction: column; gap: 10px; }
 #v-cust .tile { display: grid; grid-template-columns: 1fr auto; align-items: center; text-align: left; gap: 4px 12px; min-height: 76px; padding: 12px 16px; }
 #v-cust .t-name { font-size: 24px; }
@@ -2041,6 +2064,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   }
 
   /* ---------- 共用资料订阅 ---------- */
+  /* 省连线：只有用得到的画面才订阅对应资料。
+     订单清单：点餐、客人、出餐进度画面才需要（出餐端有自己的「待做」订阅，管理者端需要时才读取）。
+     密码资料：只有管理者画面才读，客人的手机不会下载到。 */
+  var adminFeedOn = false, ordersFeedOn = false;
+  function ensureFeeds() {
+    if (!sharedStarted || !ready || !db) return;
+    if (currentView === "admin" && !adminFeedOn) { adminFeedOn = true; startAdminFeed(); }
+    if ((currentView === "order" || currentView === "cust" || currentView === "board" || currentView === "qr") && !ordersFeedOn) { ordersFeedOn = true; startOrdersFeed(); }
+  }
   function startShared() {
     if (sharedStarted || !ready || !db) return;
     sharedStarted = true;
@@ -2056,6 +2088,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     db.doc("config/shop").onSnapshot(function (snap) {
       applyShop(snap.exists ? snap.data() : null);
     }, function () {});
+    startSold();
+    ensureFeeds();
+  }
+  function startAdminFeed() {
     db.doc("config/resetpw").onSnapshot(function (snap) {
       var x = snap.exists ? snap.data() : null;
       resetPw = x && typeof x.pw === "string" && /^\d{4,12}$/.test(x.pw) ? x.pw : "";
@@ -2067,6 +2103,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       adminPw = x && typeof x.pw === "string" && /^\d{4,12}$/.test(x.pw) ? x.pw : ADMIN_PASSWORD;
       renderPass();
     }, function () {});
+  }
+  function startSold() {
     db.collection("soldout").onSnapshot(function (snap) {
       var m = {};
       snap.docs.forEach(function (d) { m[d.id] = d.data(); });
@@ -2076,6 +2114,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (pick) renderPick();
       if (!$("#sheet").hidden && sheetView === "cart" && !sending) renderSheet();
     }, function () {});
+  }
+  function startOrdersFeed() {
     db.collection("orders").where("day", "==", dayKey()).onSnapshot(function (snap) {
       todayOrders = snap.docs.map(function (d) {
         var x = d.data();
@@ -2302,9 +2342,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var cash = payFor.method === "现金";
     var h = '<p class="due"><span>应收</span><b>' + money(payFor.due) + "</b></p>" +
       '<div class="stack" style="gap:10px"><p class="field-label">付款方式</p><div class="chips" role="radiogroup" aria-label="付款方式">' +
-      PAY_METHODS.map(function (m) {
+      qMethods().map(function (m) {
         return '<button type="button" class="chip" role="radio" aria-checked="' + (payFor.method === m) + '" data-act="pay-method" data-value="' + esc(m) + '">' + esc(m) + "</button>";
-      }).join("") + "</div></div>";
+      }).join("") + "</div></div>" + qPayHtml();
     if (cash) {
       var bills = billsFor().filter(function (v) { return v > payFor.due; }).slice(0, 4);
       h += '<div class="stack" style="gap:10px"><p class="field-label">客人给了多少？（刚好就不用点）</p><div class="chips" role="radiogroup" aria-label="客人给的金额">' +
@@ -2314,7 +2354,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }).join("") + '</div><input class="inp pk-time" id="pay-recv-in" type="text" inputmode="decimal" maxlength="9" autocomplete="off" placeholder="其他金额" aria-label="客人给的其他金额"></div>' +
         '<p class="change" id="pay-change" hidden></p>';
     }
-    h += '<button type="button" class="pk-add" id="pay-go" data-act="pay-go">' + (payFor.collect ? "收款" : "出餐并收款") + "（" + esc(payFor.method) + "）</button>" +
+    h += '<button type="button" class="pk-add" id="pay-go" data-act="pay-go">' + (qFor(payFor.method) ? (payFor.collect ? "已核对，收款" : "已核对，出餐并收款") : payFor.collect ? "收款" : "出餐并收款") + "（" + esc(payFor.method) + "）</button>" +
       (payFor.collect ? "" : '<button type="button" class="ghost" data-act="pay-unpaid" style="width:100%">出餐，交给前面收款</button>');
     $("#pay-body").innerHTML = h;
     updatePayChange();
@@ -2498,7 +2538,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         days[k] = snap.docs.map(function (d) {
           var x = d.data();
           return {
-            id: d.id, no: x.no, day: k, payStatus: x.payStatus || "", payMethod: x.payMethod || "",
+            id: d.id, no: x.no, day: k, payStatus: x.payStatus || "", payMethod: x.payMethod || "", doneAt: Number(x.doneAt) || 0, pickupAt: Number(x.pickupAt) || 0, autoClosed: !!x.autoClosed,
             createdAt: Number(x.createdAt) || 0, status: x.status, total: x.total,
             cutlery: x.cutlery || "", bag: x.bag || "", dine: x.dine || "",
             lines: (x.lines || []).map(function (l) { return { name: String(l.name), unit: String(l.unit), qty: Number(l.qty) || 0, price: l.price, opts: Array.isArray(l.opts) ? l.opts.map(String) : [] }; })
@@ -2708,6 +2748,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       '<p class="note">每一格是 30 分钟，数字是该时段的订单组数。</p></div>' + buildHabits(live) +
       (names.length ? '<div class="card"><h3>卖得最多</h3><div>' + itemRows + "</div></div>" : "") +
       (multi ? '<div class="card"><h3>每天的订单与营业额（' + esc(rangeTitle()) + '）</h3><div>' + dayRows + "</div></div>" : "");
+    try { html += xSpeedCard(live); xReport = all; } catch (eX) {}
     $("#admin-out").innerHTML = html;
     $("#admin-status").textContent = rangeTitle() + "　更新于 " + clock(adminData.at) + "。资料保留最近 45 天。";
   }
@@ -3011,6 +3052,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     $("#v-board").hidden = currentView !== "board";
     if (currentView === "cust") { loadMyIds(); renderCustHead(); renderCustMine(); }
     if (currentView === "board") { boardSeen = null; renderBoard(); }
+    try { keepOnRoute(currentView); } catch (eK) {}
     if (currentView === "net") renderNet();
     if (currentView === "qr") renderQr();
     renderEta();
@@ -3023,6 +3065,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (currentView === "order") refreshOrderStatus();
     if (currentView === "kitchen") startKitchen();
     if (currentView === "admin") applyAdminGate();
+    ensureFeeds();
     window.scrollTo(0, 0);
   }
 
@@ -4693,8 +4736,7 @@ var TW_CHARS = "与丑专业丝两个为丽么乌乐习于产仅从们价会传�
     box.hidden = !mine.length;
     box.innerHTML = mine.map(function (o) {
       var st = orderState(o);
-      var em = o.status === "pending" ? etaForOrder(o) : 0;
-      return '<div class="cm-row"><span class="cm-no">#' + esc(dno(o)) + '</span><span class="cm-st ' + st[1] + '">' + st[0] + (em ? " · 预计约 " + em + " 分钟" : "") + "</span></div>";
+      return '<div class="cm-row"><span class="cm-no">#' + esc(dno(o)) + '</span><span class="cm-st ' + st[1] + '">' + st[0] + "</span>" + xEta(o) + "</div>";
     }).join("");
   }
   var boardSeen = null, bSoundOn = false;
@@ -4731,6 +4773,7 @@ var TW_CHARS = "与丑专业丝两个为丽么乌乐习于产仅从们价会传�
     var ids = {}; rdy.forEach(function (o) { ids[o.id] = 1; });
     if (boardSeen) {
       var fresh = rdy.some(function (o) { return !boardSeen[o.id]; });
+      try { xCall(rdy.filter(function (o) { return !boardSeen[o.id]; })); } catch (eX) {}
       if (fresh && bSoundOn) { var sv = soundOn; soundOn = true; beep(); soundOn = sv; }
     }
     boardSeen = ids;
@@ -4987,8 +5030,410 @@ var TW_CHARS = "与丑专业丝两个为丽么乌乐习于产仅从们价会传�
     applyLang();
   }
 
+  /* ---------- 常驻模式（屏幕一直亮着）---------- */
+  var KEEP = { on: false, hot: false, wl: null, how: "off", vid: null, batt: null, lowAt: 0 };
+  var KEEP_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  var KEEP_MP4 = "data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAMxbW9vdgAAAGxtdmhkAAAAAAAAAAAAAAAAAAAD6AAAB9AAAQAAAQAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAlt0cmFrAAAAXHRraGQAAAADAAAAAAAAAAAAAAABAAAAAAAAB9AAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAABAAAAAQAAAAAAAkZWR0cwAAABxlbHN0AAAAAAAAAAEAAAfQAAAAAAABAAAAAAHTbWRpYQAAACBtZGhkAAAAAAAAAAAAAAAAAABAAAAAgABVxAAAAAAALWhkbHIAAAAAAAAAAHZpZGUAAAAAAAAAAAAAAABWaWRlb0hhbmRsZXIAAAABfm1pbmYAAAAUdm1oZAAAAAEAAAAAAAAAAAAAACRkaW5mAAAAHGRyZWYAAAAAAAAAAQAAAAx1cmwgAAAAAQAAAT5zdGJsAAAAtnN0c2QAAAAAAAAAAQAAAKZhdmMxAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAABAAEABIAAAASAAAAAAAAAABFUxhdmM2MC4zMS4xMDIgbGlieDI2NAAAAAAAAAAAAAAAGP//AAAALGF2Y0MBQsAe/+EAFWdCwB7aewEQAAADABAAAAMAQPFi6gEABGjOD8gAAAAQcGFzcAAAAAEAAAABAAAAFGJ0cnQAAAAAAAAKeAAACngAAAAYc3R0cwAAAAAAAAABAAAABAAAIAAAAAAUc3RzcwAAAAAAAAABAAAAAQAAABxzdHNjAAAAAAAAAAEAAAABAAAABAAAAAEAAAAkc3RzegAAAAAAAAAAAAAABAAAAoMAAAAJAAAACQAAAAkAAAAUc3RjbwAAAAAAAAABAAADYQAAAGJ1ZHRhAAAAWm1ldGEAAAAAAAAAIWhkbHIAAAAAAAAAAG1kaXJhcHBsAAAAAAAAAAAAAAAALWlsc3QAAAAlqXRvbwAAAB1kYXRhAAAAAQAAAABMYXZmNjAuMTYuMTAwAAAACGZyZWUAAAKmbWRhdAAAAm0GBf//adxF6b3m2Ui3lizYINkj7u94MjY0IC0gY29yZSAxNjQgcjMxMDggMzFlMTlmOSAtIEguMjY0L01QRUctNCBBVkMgY29kZWMgLSBDb3B5bGVmdCAyMDAzLTIwMjMgLSBodHRwOi8vd3d3LnZpZGVvbGFuLm9yZy94MjY0Lmh0bWwgLSBvcHRpb25zOiBjYWJhYz0wIHJlZj0xIGRlYmxvY2s9MTowOjAgYW5hbHlzZT0weDE6MHgxIG1lPWhleCBzdWJtZT0yIHBzeT0xIHBzeV9yZD0xLjAwOjAuMDAgbWl4ZWRfcmVmPTAgbWVfcmFuZ2U9MTYgY2hyb21hX21lPTEgdHJlbGxpcz0wIDh4OGRjdD0wIGNxbT0wIGRlYWR6b25lPTIxLDExIGZhc3RfcHNraXA9MSBjaHJvbWFfcXBfb2Zmc2V0PTAgdGhyZWFkcz0xIGxvb2thaGVhZF90aHJlYWRzPTEgc2xpY2VkX3RocmVhZHM9MCBucj0wIGRlY2ltYXRlPTEgaW50ZXJsYWNlZD0wIGJsdXJheV9jb21wYXQ9MCBjb25zdHJhaW5lZF9pbnRyYT0wIGJmcmFtZXM9MCB3ZWlnaHRwPTAga2V5aW50PTI1MCBrZXlpbnRfbWluPTIgc2NlbmVjdXQ9NDAgaW50cmFfcmVmcmVzaD0wIHJjX2xvb2thaGVhZD0xMCByYz1jcmYgbWJ0cmVlPTEgY3JmPTIzLjAgcWNvbXA9MC42MCBxcG1pbj0wIHFwbWF4PTY5IHFwc3RlcD00IGlwX3JhdGlvPTEuNDAgYXE9MToxLjAwAIAAAAAOZYiEBT///w9FAAE9/4AAAAAFQZogFPUAAAAFQZpAFPUAAAAFQZpgEvU=";
+  function K(zh, en) { return lang === "zh-CN" ? zh : lang === "zh-TW" ? trTW(zh) : en; }
+  function keepGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function keepSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function keepVideo() {
+    if (!KEEP.vid) {
+      var v = document.createElement("video");
+      v.setAttribute("playsinline", ""); v.setAttribute("webkit-playsinline", ""); v.setAttribute("aria-hidden", "true"); v.setAttribute("data-notr", "");
+      v.muted = true; v.loop = true; v.playsInline = true; v.src = KEEP_MP4;
+      v.style.cssText = "position:fixed;left:0;bottom:0;width:2px;height:2px;opacity:.01;pointer-events:none;z-index:-1";
+      document.body.appendChild(v);
+      KEEP.vid = v;
+    }
+    var p = null;
+    try { p = KEEP.vid.play(); } catch (e) {}
+    return p && p.then ? p.then(function () { return true; }, function () { return false; }) : Promise.resolve(false);
+  }
+  /* 先用系统的「屏幕常亮」；不支持（例如用 http://192.168… 网址）或被拒绝时，改用备用方式 */
+  function keepStart(gesture) {
+    if (!KEEP.on || document.hidden) return;
+    var canWl = !!(navigator.wakeLock && navigator.wakeLock.request);
+    var gotWl = KEEP.wl ? Promise.resolve(true) : canWl ? navigator.wakeLock.request("screen").then(function (s) {
+      KEEP.wl = s;
+      s.addEventListener("release", function () { if (KEEP.wl === s) { KEEP.wl = null; if (KEEP.on && !document.hidden) keepStart(false); } });
+      return true;
+    }, function () { return false; }) : Promise.resolve(false);
+    gotWl.then(function (okWl) {
+      if (!KEEP.on) return;
+      if (okWl && !KEEP_IOS) { KEEP.how = "wl"; keepRender(); return; }
+      keepVideo().then(function (okV) {
+        if (!KEEP.on) return;
+        KEEP.how = okWl ? "wl" : okV ? "video" : gesture ? "none" : "tap";
+        keepRender();
+      });
+    });
+  }
+  function keepStop() {
+    var s = KEEP.wl; KEEP.wl = null;
+    if (s) { try { s.release(); } catch (e) {} }
+    if (KEEP.vid) { try { KEEP.vid.pause(); } catch (e) {} }
+    KEEP.how = "off";
+  }
+  function keepBattToast() {
+    var b = KEEP.batt;
+    showToast(K("这台没有接电，常驻会很耗电，请接上充电器（电量 ", "Not charging — always-on drains the battery. Please plug in (battery ") + Math.round((b ? b.level : 0) * 100) + "%)", false, true, 4500);
+  }
+  function keepSetOn(on, silent) {
+    if (!on && KEEP.hot && !silent) {
+      if (Date.now() - (KEEP.offAsk || 0) > 6000) {
+        KEEP.offAsk = Date.now();
+        showToast(K("这台设备正在分享 WiFi，关掉常驻可能让其他机台断线。要关的话，请再按一次", "This device is sharing WiFi; turning always-on off may disconnect the others. Tap again to confirm."), false, true, 6000);
+        return;
+      }
+      KEEP.hot = false; keepSet("xlb-hot", "0");
+    }
+    KEEP.on = !!on; keepSet("xlb-keep", on ? "1" : "0");
+    if (on) { KEEP.how = "tap"; keepStart(!silent); } else keepStop();
+    keepRender();
+    if (silent) return;
+    if (on && KEEP.batt && !KEEP.batt.charging) keepBattToast();
+    else showToast(on ? K("常驻模式已开启：屏幕会一直亮着", "Always-on mode is ON: the screen stays awake") : K("已改回正常使用", "Back to normal use"), false, true, 2600);
+  }
+  function keepSetHot(h) {
+    KEEP.hot = !!h; keepSet("xlb-hot", h ? "1" : "0");
+    if (h && !KEEP.on) keepSetOn(true, true);
+    keepRender();
+    if (h) showToast(K("已记下：这台在分享 WiFi，请一直接电并保持常驻", "Noted: this device shares WiFi — keep it plugged in and always-on"), false, true, 3500);
+  }
+  function keepHowText() {
+    return { wl: K("目前：系统屏幕常亮已启用", "Active: system screen wake lock"),
+      video: K("目前：备用方式已启用（这个网址不支持系统常亮）", "Active: fallback method (this address has no system wake lock)"),
+      tap: K("请点一下画面，常驻才会生效", "Tap the screen once to start always-on"),
+      none: K("这个浏览器无法保持常亮。请改用 Chrome 或 Safari，或到系统设置把自动锁定改成「永不」", "This browser cannot keep the screen on. Use Chrome or Safari, or set Auto-Lock to Never in system settings."),
+      off: K("目前是正常使用：屏幕会照系统设定自动变暗、锁定", "Normal use: the screen dims and locks as set in the system.") }[KEEP.how] || "";
+  }
+  function keepSheetHtml() {
+    var b = KEEP.batt, bt = b ? "<p class=\"note\">" + K("电量 ", "Battery ") + Math.round(b.level * 100) + "%，" + (b.charging ? K("充电中", "charging") : K("没有接电", "not charging")) + "</p>" : "";
+    return "<p>" + K("开启后，这台设备的屏幕不会自动变暗或锁定，App 画面会一直留在前面。按「正常使用」就恢复系统原本的设定。", "While on, this device's screen will not dim or lock and the app stays in front. Switch back to Normal to restore the system settings.") + "</p>" +
+      "<button type=\"button\" class=\"keepbtn big" + (KEEP.on ? " on" : "") + "\" data-keep=\"toggle\" data-notr>" + keepLabel() + "</button>" +
+      "<p class=\"note\"><strong>" + keepHowText() + "</strong></p>" + bt +
+      "<label class=\"keepchk\"><input type=\"checkbox\" id=\"keep-hot\"" + (KEEP.hot ? " checked" : "") + "> <span>" + K("这台设备正在分享 WiFi（开着手机热点）", "This device is sharing WiFi (hotspot is on)") + "</span></label>" +
+      "<h3>" + K("摊上有 3 台机台时的建议", "Suggested setup with 3 devices at the stall") + "</h3>" +
+      "<ul class=\"keeplist\">" +
+      "<li>" + K("机台 1：开热点、分享 WiFi，同时兼任点餐、出餐或看板其中一台。这台一定要开常驻，并且一直接电。勾选上面的「正在分享 WiFi」后，要关常驻会先提醒你。", "Device 1: runs the hotspot and also works as order, kitchen or board. It must be always-on and plugged in. If you tick the box above, turning always-on off will ask first.") + "</li>" +
+      "<li>" + K("机台 2、3：连上机台 1 的热点。看板那台也要开常驻（第一次打开看板会自动开启）。", "Devices 2 and 3: join device 1's hotspot. The board device should also be always-on (it turns on automatically the first time you open the board).") + "</li>" +
+      "<li>" + K("只有 WiFi 的平板不能开热点，请让有行动网络的手机当机台 1；平板当看板，接电常亮即可。", "A WiFi-only tablet cannot host a hotspot: use a phone with mobile data as device 1, and the tablet as the board, plugged in and always-on.") + "</li>" +
+      "<li>" + K("热点中断时，每台仍能点餐、出餐；连回来后自动同步，但中断期间看不到别台的新单。", "If the hotspot drops, every device can still take and serve orders; they sync after reconnecting, but new orders from other devices are not visible meanwhile.") + "</li>" +
+      "</ul>" +
+      "<h3>" + K("要注意", "Good to know") + "</h3>" +
+      "<ul class=\"keeplist\">" +
+      "<li>" + K("网页只能让屏幕保持亮着，挡不住有人按 Home 键、来电或通知。想锁在 App 里：iPhone／iPad 开「引导式访问」（设置 → 辅助使用），Android 开「屏幕固定」。", "A web page can only keep the screen on; it cannot stop someone pressing Home, or calls and notifications. To lock the device to this app, use Guided Access (iPhone/iPad: Settings → Accessibility) or Screen Pinning (Android).") + "</li>" +
+      "<li>" + K("一直亮着很耗电，请接上充电器。", "Staying on drains the battery — keep a charger connected.") + "</li>" +
+      "</ul>";
+  }
+  function keepLabel() { return KEEP.on ? "☀ " + K("常驻中", "Always on") + (KEEP.hot ? " 📶" : "") : "☾ " + K("正常使用", "Normal use"); }
+  function keepRender() {
+    var bs = document.querySelectorAll(".keepbtn");
+    for (var i = 0; i < bs.length; i++) {
+      bs[i].textContent = keepLabel();
+      bs[i].classList.toggle("on", KEEP.on);
+      bs[i].setAttribute("aria-pressed", KEEP.on ? "true" : "false");
+    }
+    var ifs = document.querySelectorAll(".keepinfo");
+    for (var j = 0; j < ifs.length; j++) ifs[j].setAttribute("aria-label", K("常驻模式说明", "About always-on mode"));
+    var h = document.querySelector("#keep-hint");
+    if (h) h.textContent = K("屏幕常亮：给出餐看板、分享 WiFi 的那台用", "Keep screen on: for the pickup board and the WiFi-sharing device");
+    var bn = document.querySelector("#keep-banner");
+    if (bn) { bn.hidden = !(KEEP.on && KEEP.how === "tap"); bn.textContent = K("点一下这里，常驻模式才会生效", "Tap here to start always-on mode"); }
+    var sh = document.querySelector("#keep");
+    if (sh && !sh.hidden) {
+      document.querySelector("#keep-title").textContent = K("常驻模式（屏幕一直亮）", "Always-on mode (screen stays awake)");
+      document.querySelector("#keep-close").textContent = K("关闭", "Close");
+      document.querySelector("#keep-body").innerHTML = keepSheetHtml();
+    }
+  }
+  function keepOnRoute(v) {
+    if (v === "board" && keepGet("xlb-keep") === null && !KEEP.on) {
+      keepSetOn(true, true);
+      showToast(K("已为出餐看板开启常驻模式，可在右上角改回正常使用", "Always-on mode is ON for this board. Switch it off at the top right."), false, true, 4000);
+    }
+  }
+  function keepInit() {
+    var btn = '<button type="button" class="keepbtn" data-keep="toggle" data-notr></button><button type="button" class="keepinfo" data-keep="info" data-notr>?</button>';
+    var home = document.querySelector("#v-home .home-grid");
+    if (home) home.insertAdjacentHTML("afterend", '<div class="keeprow" data-notr>' + btn + '<span class="help" id="keep-hint" data-notr></span></div>');
+    ["#v-order .tools", "#v-kitchen .tools"].forEach(function (sel) {
+      var h = document.querySelector(sel); if (!h) return;
+      var lb = h.querySelector(".langbox");
+      if (lb) lb.insertAdjacentHTML("beforebegin", btn); else h.insertAdjacentHTML("beforeend", btn);
+    });
+    var bs = document.querySelector("#board-sound");
+    if (bs) bs.insertAdjacentHTML("beforebegin", btn);
+    document.body.insertAdjacentHTML("beforeend",
+      '<button type="button" id="keep-banner" data-keep="resume" data-notr hidden></button>' +
+      '<div class="sheet" id="keep" hidden data-notr><div class="scrim" data-keep="close"></div>' +
+      '<div class="panel" role="dialog" aria-modal="true" aria-labelledby="keep-title"><div class="panel-head"><h2 id="keep-title"></h2>' +
+      '<button type="button" class="close" id="keep-close" data-keep="close"></button></div><div class="stack" id="keep-body"></div></div></div>');
+    document.addEventListener("click", function (e) {
+      var t = e.target && e.target.closest ? e.target.closest("[data-keep]") : null;
+      if (!t) return;
+      var a = t.getAttribute("data-keep");
+      if (a === "toggle") keepSetOn(!KEEP.on);
+      else if (a === "info") { document.querySelector("#keep").hidden = false; keepRender(); }
+      else if (a === "close") document.querySelector("#keep").hidden = true;
+      else if (a === "resume") keepStart(true);
+    });
+    var retry = function () { if (KEEP.on && KEEP.how === "tap") keepStart(true); };
+    document.addEventListener("click", retry, true);
+    document.addEventListener("touchend", retry, true);
+    document.addEventListener("change", function (e) {
+      var el = e.target;
+      if (el && el.id === "keep-hot") keepSetHot(el.checked);
+      else if (el && el.classList && el.classList.contains("langsel")) setTimeout(keepRender, 0);
+    });
+    var back = function () { if (!document.hidden && KEEP.on) { if (KEEP.how === "off") KEEP.how = "tap"; keepStart(false); } };
+    document.addEventListener("visibilitychange", back);
+    window.addEventListener("pageshow", back);
+    KEEP.hot = keepGet("xlb-hot") === "1";
+    var pref = keepGet("xlb-keep");
+    KEEP.on = pref === "1" || (KEEP.hot && pref === null);
+    if (navigator.getBattery) navigator.getBattery().then(function (b) {
+      KEEP.batt = b;
+      b.addEventListener("chargingchange", function () { if (KEEP.on && !b.charging) keepBattToast(); keepRender(); });
+      b.addEventListener("levelchange", function () {
+        if (KEEP.on && !b.charging && b.level <= 0.2 && Date.now() - KEEP.lowAt > 300000) { KEEP.lowAt = Date.now(); keepBattToast(); }
+      });
+    }, function () {});
+    if (KEEP.on) KEEP.how = "tap";
+    keepRender();
+    if (KEEP.on) keepStart(false);
+  }
+
+  /* ---------- 收款码（LINE Pay、街口等：店家上传一次，收款时放大显示）---------- */
+  var QR = { list: [], db: null, un: null, msg: "", bad: false, busy: false };
+  function qFor(m) { for (var i = 0; i < QR.list.length; i++) if (QR.list[i].m === m) return QR.list[i]; return null; }
+  function qMethods() {
+    var out = PAY_METHODS.slice();
+    QR.list.forEach(function (q) { if (out.indexOf(q.m) < 0) out.push(q.m); });
+    return out;
+  }
+  function qApply(x) {
+    var l = x && Array.isArray(x.list) ? x.list : [];
+    QR.list = l.filter(function (q) { return q && typeof q.m === "string" && typeof q.d === "string" && q.m.trim() && q.d.length <= 1500; })
+      .slice(0, 4).map(function (q) { return { m: q.m.trim().slice(0, 14), d: q.d }; });
+    qRenderAdmin();
+    if (payFor && !$("#pay").hidden) renderPay();
+  }
+  function qWatch() {
+    if (!db || db === QR.db) return;
+    if (QR.un) { try { QR.un(); } catch (e) {} QR.un = null; }
+    QR.db = db;
+    try { QR.un = db.doc("config/payqr").onSnapshot(function (snap) { qApply(snap.exists ? snap.data() : null); }, function () {}); } catch (e) {}
+  }
+  function qPayHtml() {
+    if (!payFor) return "";
+    var q = qFor(payFor.method);
+    if (!q) return "";
+    return '<div class="qpay" data-notr>' + qrSvg(q.d) +
+      '<p class="qpay-amt">' + K("请客人用 " + esc(q.m) + " 扫码，输入", "Ask the customer to scan with " + esc(q.m) + " and enter") + " <b>" + money(payFor.due) + "</b></p>" +
+      '<ul class="keeplist"><li>' + K("看客人手机的「付款成功」画面，金额要一样", "Check the amount on the customer's payment-success screen") + "</li>" +
+      "<li>" + K("再看你自己手机的收款通知，确定钱进来了", "Then check the payment notification on your own phone") + "</li></ul></div>";
+  }
+  function qSave(list) {
+    if (!db) { QR.msg = K("没有连上资料库，无法储存。", "Not connected; cannot save."); QR.bad = true; qRenderAdmin(); return Promise.resolve(); }
+    QR.busy = true;
+    return db.doc("config/payqr").set({ list: list, updatedAt: Date.now() }).then(function () {
+      QR.busy = false; QR.list = list; qRenderAdmin();
+    }, function () { QR.busy = false; QR.msg = K("储存失败，请再试一次。", "Save failed, please try again."); QR.bad = true; qRenderAdmin(); });
+  }
+  function qRenderAdmin() {
+    var box = document.querySelector("#qr-admin"); if (!box) return;
+    var rows = QR.list.map(function (q, i) {
+      return '<div class="qrow"><div class="qrow-qr">' + qrSvg(q.d) + '</div><div class="stack" style="gap:8px;min-width:0"><b>' + esc(q.m) + '</b>' +
+        '<button type="button" class="btn-sm" data-q="del" data-i="' + i + '">' + K("删除", "Delete") + "</button></div></div>";
+    }).join("");
+    box.innerHTML = '<h3>' + K("收款码（LINE Pay、街口等）", "Payment QR codes (LINE Pay etc.)") + "</h3>" +
+      '<p class="note">' + K("把收款立牌或 App 里的收款码拍照、截图上传一次。之后收款时选这个付款方式，画面会放大显示收款码和应收金额，客人直接对着屏幕扫。", "Upload a photo or screenshot of your payment QR once. When you choose this payment method, the code is shown large with the amount due, for the customer to scan.") + "</p>" +
+      '<p class="note">' + K("系统收不到付款通知：还是要看客人的付款成功画面，以及你自己手机的收款通知，再按收款。", "The app cannot see payments: check the customer's success screen and your own notification before confirming.") + "</p>" +
+      (rows ? '<div class="stack">' + rows + "</div>" : "") +
+      (QR.list.length < 4 ? '<label class="fld"><span>' + K("付款方式名称", "Payment method name") + '</span><input class="inp" id="qr-name" type="text" maxlength="14" value="' + (QR.list.some(function (q) { return q.m === "LINE Pay"; }) ? "" : "LINE Pay") + '" autocomplete="off"></label>' +
+        '<label class="send qr-up">' + K("上传收款码照片", "Upload QR photo") + '<input type="file" accept="image/*" id="qr-file" hidden></label>' : "") +
+      (QR.msg ? '<p class="' + (QR.bad ? "err" : "note") + '">' + esc(QR.msg) + "</p>" : "");
+  }
+  function qFromFile(file) {
+    var name = (($("#qr-name") || {}).value || "").trim().slice(0, 14);
+    var say = function (t, bad) { QR.msg = t; QR.bad = !!bad; qRenderAdmin(); };
+    if (!name) { say(K("请先填付款方式名称，例如 LINE Pay。", "Enter a payment method name first, e.g. LINE Pay."), true); return; }
+    if (name === "现金") { say(K("现金不需要收款码。", "Cash does not need a QR code."), true); return; }
+    var img = new Image(), url = URL.createObjectURL(file);
+    img.onload = function () {
+      var r = null;
+      [1600, 1000, 600].some(function (mx) {
+        var sc = Math.min(1, mx / Math.max(img.width, img.height)), w = Math.max(1, Math.round(img.width * sc)), h = Math.max(1, Math.round(img.height * sc));
+        var cv = document.createElement("canvas"); cv.width = w; cv.height = h; var cx = cv.getContext("2d"); cx.drawImage(img, 0, 0, w, h);
+        try { r = jsQR(cx.getImageData(0, 0, w, h).data, w, h); } catch (e) { r = null; }
+        return !!(r && r.data);
+      });
+      URL.revokeObjectURL(url);
+      if (!r || !r.data) { say(K("照片里找不到 QR 码。请只拍收款码那一块，拍正、拍清楚，避免反光。", "No QR code found. Photograph just the code, straight on and in focus."), true); return; }
+      if (/^XLB/.test(r.data)) { say(K("这是本系统的配对码，不是收款码。", "That is this app's pairing code, not a payment code."), true); return; }
+      if (r.data.length > 1500) { say(K("这个 QR 码内容太长，无法储存。", "This QR code is too long to store."), true); return; }
+      var list = QR.list.filter(function (q) { return q.m !== name; }).concat([{ m: name, d: r.data }]).slice(0, 4);
+      QR.msg = K("已储存「" + name + "」的收款码。收款时选「" + name + "」就会显示。", "Saved the QR for \"" + name + "\". Choose \"" + name + "\" when collecting payment."); QR.bad = false;
+      qSave(list);
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); say(K("无法读取这张照片。", "Cannot read this image."), true); };
+    img.src = url;
+  }
+  function qInit() {
+    var shopCard = document.querySelector("#panel-shop .card");
+    if (shopCard) shopCard.insertAdjacentHTML("afterend", '<div class="card stack" id="qr-admin" data-notr></div>');
+    document.addEventListener("click", function (e) {
+      var t = e.target && e.target.closest ? e.target.closest("[data-q]") : null;
+      if (!t) return;
+      if (t.getAttribute("data-q") === "del") {
+        var i = Number(t.getAttribute("data-i")), q = QR.list[i];
+        if (!q) return;
+        if (QR.delAsk !== i || Date.now() - (QR.delAt || 0) > 6000) { QR.delAsk = i; QR.delAt = Date.now(); QR.msg = K("要删除「" + q.m + "」的收款码吗？再按一次删除。", "Delete the QR for \"" + q.m + "\"? Tap Delete again."); QR.bad = true; qRenderAdmin(); return; }
+        QR.delAsk = -1; QR.msg = K("已删除。", "Deleted."); QR.bad = false;
+        qSave(QR.list.filter(function (x, k) { return k !== i; }));
+      }
+    });
+    document.addEventListener("change", function (e) {
+      var el = e.target;
+      if (el && el.id === "qr-file" && el.files && el.files[0]) { qFromFile(el.files[0]); el.value = ""; }
+      else if (el && el.classList && el.classList.contains("langsel")) setTimeout(qRenderAdmin, 0);
+    });
+    qRenderAdmin();
+    qWatch();
+    setInterval(qWatch, 1500);
+  }
+
+  /* ---------- 预计等候、语音叫号、出餐速度、汇出报表 ---------- */
+  var XW = {
+    ahead: ["前面还有 {n} 张单", "{n} orders ahead of you", "前に{n}件", "앞에 {n}건", "أمامك {n} طلبات", "{n} הזמנות לפניך", "{n} pesanan di depan Anda", "Còn {n} đơn phía trước", "มีอีก {n} ออเดอร์ก่อนหน้า", "{n} order ang nauuna sa iyo"],
+    next: ["下一个就是你", "You're next", "次はあなたの番です", "다음 차례입니다", "أنت التالي", "אתם הבאים בתור", "Giliran Anda berikutnya", "Sắp đến lượt bạn", "คิวถัดไปคือคุณ", "Ikaw na ang susunod"],
+    eta: ["预计约 {n} 分钟", "about {n} min", "約{n}分", "약 {n}분", "حوالي {n} دقيقة", "כ-{n} דקות", "sekitar {n} menit", "khoảng {n} phút", "ประมาณ {n} นาที", "mga {n} minuto"],
+    voice: ["语音叫号", "Voice call", "音声呼び出し", "음성 호출", "النداء الصوتي", "קריאה קולית", "Panggilan suara", "Gọi số bằng giọng nói", "เรียกคิวด้วยเสียง", "Voice call"],
+    on: ["开", "on", "オン", "켜짐", "يعمل", "פועל", "aktif", "bật", "เปิด", "on"],
+    off: ["关", "off", "オフ", "꺼짐", "متوقف", "כבוי", "mati", "tắt", "ปิด", "off"]
+  };
+  function XL(k, n) {
+    var r = XW[k], s = lang === "zh-CN" ? r[0] : lang === "zh-TW" ? trTW(r[0]) : (r[I18N_COL[lang]] || r[1]);
+    return s.replace("{n}", n);
+  }
+  function xAhead(o) {
+    var now = Date.now();
+    return todayOrders.filter(function (p) {
+      if (p.status !== "pending" || p.id === o.id) return false;
+      if (p.pickupAt && p.pickupAt - now > 15 * 60000) return false;
+      return p.rush || (p.pickupAt || p.createdAt) < (o.pickupAt || o.createdAt);
+    }).length;
+  }
+  function xEta(o) {
+    if (!o || o.status !== "pending" || o.pickupAt) return "";
+    var n = xAhead(o), em = etaForOrder(o);
+    var t = n ? XL("ahead", n) : XL("next");
+    if (em) t += " · " + XL("eta", em);
+    return '<span class="cm-eta" data-notr>' + esc(t) + "</span>";
+  }
+  var xVoiceOn = false;
+  function xVoiceLabel() { var b = document.querySelector("#board-voice"); if (b) b.textContent = XL("voice") + "：" + XL(xVoiceOn ? "on" : "off"); }
+  function xSay(text, code) {
+    try {
+      var u = new SpeechSynthesisUtterance(text);
+      u.lang = code; u.rate = 0.9;
+      window.speechSynthesis.speak(u);
+    } catch (e) {}
+  }
+  function xCallText(no) {
+    var n = String(Number(no) || no);
+    if (lang === "zh-CN") return [n + " 号，请取餐", "zh-CN"];
+    if (lang === "zh-TW") return [n + " 號，請取餐", "zh-TW"];
+    if (lang === "ja") return [n + "番のお客様、お受け取りください", "ja-JP"];
+    if (lang === "ko") return [n + "번 고객님, 음식이 나왔습니다", "ko-KR"];
+    return ["Number " + n + ", your order is ready", "en-US"];
+  }
+  function xCall(list) {
+    if (!xVoiceOn || !window.speechSynthesis || !list || !list.length) return;
+    list.slice(0, 3).forEach(function (o) { var c = xCallText(dno(o)); xSay(c[0], c[1]); xSay(c[0], c[1]); });
+  }
+  function xVoiceToggle() {
+    if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) { showToast(K("这个浏览器不支持语音叫号", "This browser does not support voice calling"), false, true, 3000); return; }
+    xVoiceOn = !xVoiceOn;
+    try { localStorage.setItem("xlb-voice", xVoiceOn ? "1" : "0"); } catch (e) {}
+    xVoiceLabel();
+    if (xVoiceOn) { try { window.speechSynthesis.cancel(); } catch (e) {} var c = xCallText(1); xSay(c[0], c[1]); }
+  }
+  function xMin(ms) { var m = ms / 60000; return m < 10 ? (Math.round(m * 10) / 10) : Math.round(m); }
+  function xSpeedCard(live) {
+    var ds = live.filter(function (o) { return o.status === "done" && o.doneAt && !o.pickupAt && !o.autoClosed && o.doneAt > o.createdAt && o.doneAt - o.createdAt < 3 * 3600000; })
+      .map(function (o) { return o.doneAt - o.createdAt; }).sort(function (a, b) { return a - b; });
+    var h = '<div class="card"><h3>' + K("出餐速度", "Serving speed") + "</h3>";
+    if (ds.length < 3) return h + '<p class="note">' + K("做好的订单满 3 张后，这里会显示从下单到出餐平均花多久。", "After 3 served orders, this shows how long orders take from order to serving.") + "</p></div>";
+    var avg = ds.reduce(function (a, b) { return a + b; }, 0) / ds.length, med = ds[Math.floor(ds.length / 2)];
+    var slow = ds.filter(function (d) { return d > 10 * 60000; }).length;
+    var u = K(" 分钟", " min");
+    return h + "<p>" + K("从下单到出餐，平均 ", "From order to serving: average ") + "<b>" + xMin(avg) + u + "</b>" + K("，一半的单子在 ", "; half of the orders within ") + "<b>" + xMin(med) + u + "</b>" + K(" 内做好。", ".") + "</p>" +
+      '<div class="drow"><span>' + K("最快", "Fastest") + "</span><span>" + xMin(ds[0]) + u + "</span><span></span></div>" +
+      '<div class="drow"><span>' + K("最慢", "Slowest") + "</span><span>" + xMin(ds[ds.length - 1]) + u + "</span><span></span></div>" +
+      '<div class="drow"><span>' + K("超过 10 分钟", "Over 10 min") + "</span><span>" + slow + K(" 张", " orders") + "</span><span>" + Math.round(slow / ds.length * 100) + "%</span></div>" +
+      '<p class="note">' + K("只算一般订单 " + ds.length + " 张；电话预约单和系统自动结束的单子不算。", "Regular orders only (" + ds.length + "); phone pre-orders and auto-closed orders are excluded.") + "</p></div>";
+  }
+  var xReport = [];
+  function xCell(v, sep) { var s = String(v === undefined || v === null ? "" : v); return sep === "\t" ? s.replace(/[\t\r\n]+/g, " ") : /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+  function xTable(sep) {
+    var head = [K("日期", "Date"), K("单号", "Order no."), K("下单时间", "Ordered at"), K("出餐时间", "Served at"), K("状态", "Status"), K("金额", "Amount"), K("收款", "Payment"), K("付款方式", "Method"), K("用餐方式", "Dine option"), K("内容", "Items")];
+    var st = { pending: K("制作中", "Preparing"), done: K("已出餐", "Served"), cancelled: K("已取消", "Cancelled") };
+    var rows = xReport.slice().sort(function (a, b) { return a.createdAt - b.createdAt; }).map(function (o) {
+      return [o.day || "", pad(o.no), clock(o.createdAt), o.doneAt ? clock(o.doneAt) : "", st[o.status] || o.status || "", o.status === "cancelled" ? 0 : orderValue(o),
+        o.payStatus === "paid" ? K("已收", "Paid") : o.payStatus === "unpaid" ? K("未收", "Unpaid") : "", o.payMethod || "", o.dine || "",
+        (o.lines || []).map(function (l) { return l.name + (l.opts && l.opts.length ? "(" + l.opts.join("/") + ")" : "") + " x" + l.qty; }).join("; ")];
+    });
+    return [head].concat(rows).map(function (r) { return r.map(function (c) { return xCell(c, sep); }).join(sep); }).join("\r\n");
+  }
+  function xExport() {
+    if (!xReport.length) { showToast(K("这段时间没有订单可以汇出", "No orders to export in this range"), false, true, 2600); return; }
+    var n = xReport.length;
+    var copy = function () {
+      var p = null;
+      try { p = navigator.clipboard.writeText(xTable("\t")); } catch (e) {}
+      if (p && p.then) p.then(function () { showToast(K("已复制 " + n + " 张订单，可直接贴到 Excel 或 Google 试算表", "Copied " + n + " orders — paste into Excel or Google Sheets"), false, true, 4000); },
+        function () { showToast(K("这个浏览器不让复制，请改用网页版汇出", "Copy was blocked by this browser"), false, true, 3500); });
+      else showToast(K("这个浏览器不让复制，请改用网页版汇出", "Copy was blocked by this browser"), false, true, 3500);
+    };
+    if (MODE_CLAUDE) { copy(); return; }
+    try {
+      var url = URL.createObjectURL(new Blob(["﻿" + xTable(",")], { type: "text/csv;charset=utf-8" }));
+      var a = document.createElement("a");
+      a.href = url; a.download = "orders-" + dayKey() + ".csv";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
+      showToast(K("已汇出 " + n + " 张订单（CSV，可用 Excel 打开）", "Exported " + n + " orders (CSV)"), false, true, 3500);
+    } catch (e) { copy(); }
+  }
+  function xInit() {
+    var bs = document.querySelector("#board-sound");
+    if (bs) bs.insertAdjacentHTML("afterend", '<button type="button" class="ghost" id="board-voice" data-x="voice" data-notr></button>');
+    var rf = document.querySelector("#admin-refresh");
+    if (rf) rf.insertAdjacentHTML("afterend", '<button type="button" class="ghost" id="admin-export" data-x="export" data-notr></button>');
+    var lab = function () { xVoiceLabel(); var e = document.querySelector("#admin-export"); if (e) e.textContent = K("汇出报表", "Export report"); };
+    document.addEventListener("click", function (e) {
+      var t = e.target && e.target.closest ? e.target.closest("[data-x]") : null;
+      if (!t) return;
+      if (t.getAttribute("data-x") === "voice") xVoiceToggle(); else xExport();
+    });
+    document.addEventListener("change", function (e) {
+      var el = e.target;
+      if (el && el.classList && el.classList.contains("langsel")) setTimeout(function () { lab(); if (currentView === "cust") renderCustMine(); }, 0);
+    });
+    setInterval(function () { if (currentView === "cust") renderCustMine(); }, 30000);
+    lab();
+    /* 重新整理后，客人的「我的点单」要再读一次（否则会被清空） */
+    if (currentView === "cust") { loadMyIds(); renderCustMine(); }
+  }
+
   initCur();
   initLang();
+  keepInit();
+  xInit();
+  qInit();
   netInit();
   try { if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol) && !MODE_CLAUDE && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") navigator.serviceWorker.register("sw.js").catch(function () {}); } catch (e) {}
   $("#gate-lan").addEventListener("click", function (e) { e.preventDefault(); netCfg = { mode: "lan", role: "host" }; saveNet(); location.hash = "#net"; location.reload(); });
