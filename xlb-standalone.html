@@ -424,8 +424,24 @@ html:not([lang^="zh"]):not([lang="ja"]) .tile strong, html:not([lang^="zh"]):not
 }
 .board { min-height: 100vh; background: #10231c; color: #fff; padding: 18px clamp(12px, 3vw, 40px) 28px; display: flex; flex-direction: column; gap: 16px; }
 .board[hidden] { display: none; }
-.etabar { margin: 0; padding: 10px 14px; border-radius: 12px; background: var(--accent-soft, #e3f1ec); color: var(--ink); font-size: 17px; }
-.beta { font-size: clamp(16px, 2.4vw, 28px); color: #fff; opacity: .92; }
+.etabar { margin: 0; padding: 14px 18px; border-radius: 16px; background: var(--accent); color: var(--on-accent); font-size: 22px; font-weight: 700; line-height: 1.4; }
+.etabar b { font-family: var(--font-display); font-size: 1.7em; line-height: 1; padding: 0 3px; }
+.beta { font-size: clamp(22px, 3.4vw, 44px); font-weight: 700; color: #fff; }
+.beta b { font-size: 1.3em; color: #ffd166; }
+.t-wait { font-size: 17px; font-weight: 700; padding: 2px 10px; border-radius: 8px; background: var(--warn-soft); color: var(--warn); }
+.t-left { font-size: 17px; font-weight: 700; color: var(--chili); }
+.pk-warn { margin: 0; padding: 8px 12px; border-radius: 10px; background: var(--warn-soft); color: var(--warn); font-size: 18px; font-weight: 700; }
+.stlist { display: flex; flex-direction: column; }
+.st-row { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; padding: 10px 0; border-top: 2px solid var(--line); }
+.st-row:first-child { border-top: 0; }
+.st-name { flex: 1 1 110px; font-size: 20px; }
+.st-f { display: flex; align-items: center; gap: 6px; font-size: 16px; color: var(--muted); }
+.st-f .inp { min-height: 46px; font-size: 17px; }
+.st-wait { width: auto; min-width: 128px; }
+.st-stock { width: 92px; }
+.st-left { font-size: 17px; font-weight: 700; color: var(--chili); }
+.stbox { padding: 12px 16px; border-radius: 16px; background: var(--surface); border: 2px solid var(--line); }
+.stbox summary { font-size: 18px; font-weight: 700; color: var(--muted); cursor: pointer; min-height: 40px; display: flex; align-items: center; }
 .qr-big .tb-card { max-width: 360px; margin: 0 auto; }
 .qr-big .tb-card svg { width: 100%; height: auto; }
 .bhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
@@ -535,9 +551,9 @@ body { background-image: var(--sky, none); background-attachment: fixed; }
       <p class="sub" id="cust-table"></p>
     </div>
   </header>
+  <p class="etabar" id="cust-eta" hidden></p>
   <div class="tools" id="cust-tools"></div>
   <div class="closedbox" id="cust-closed" hidden></div>
-  <p class="etabar" id="cust-eta" hidden></p>
   <div class="custmine" id="cust-mine" hidden></div>
   <div id="cust-menu">
   <p class="hint">点选想吃的，选好口味和数量，再按下方「看我的点单」送出。</p>
@@ -589,8 +605,8 @@ body { background-image: var(--sky, none); background-attachment: fixed; }
       <h1 class="brand">点餐</h1>
     </div>
   </header>
-  <p class="hint">先点一个品项，选口味和数量，再按「加入订单」。</p>
   <p class="etabar" id="order-eta"></p>
+  <p class="hint">先点一个品项，选口味和数量，再按「加入订单」。</p>
   <div class="tools">
     <span class="conn" id="conn-order" data-state="wait"><span class="dot"></span><span id="conn-order-text">连线中…</span></span>
     <span class="sizes" role="radiogroup" aria-label="画面大小"><span class="sz-l">画面大小</span><button type="button" class="chip sz" role="radio" aria-checked="false" data-act="size" data-value="xs">特小</button><button type="button" class="chip sz" role="radio" aria-checked="false" data-act="size" data-value="s">小</button><button type="button" class="chip sz" role="radio" aria-checked="false" data-act="size" data-value="m">中</button><button type="button" class="chip sz" role="radio" aria-checked="false" data-act="size" data-value="l">大</button><button type="button" class="chip sz" role="radio" aria-checked="true" data-act="size" data-value="xl">特大</button></span>
@@ -598,6 +614,7 @@ body { background-image: var(--sky, none); background-attachment: fixed; }
     <button type="button" class="ghost" id="open-orders" data-act="orders-open"><span id="open-orders-label">已点订单（0）</span></button>
   </div>
   <p class="banner" id="banner-order" hidden></p>
+  <details class="stbox"><summary>品项状态设定：售完、要等多久、剩余数量</summary><div class="stlist" id="sold-chips-o"></div></details>
   <div class="collect" id="collect" aria-live="polite" hidden></div>
   <div class="editbar" id="edit-banner" hidden>
     <span id="edit-text"></span>
@@ -635,8 +652,8 @@ body { background-image: var(--sky, none); background-attachment: fixed; }
     <ul class="sum-list" id="sum-list"></ul>
   </div>
   <div class="sum">
-    <span class="sum-label">售完管理（点一下切换，隔天自动恢复）</span>
-    <div class="chips" id="sold-chips"></div>
+    <span class="sum-label">品项状态：售完、要等多久、剩余数量（隔天自动恢复）</span>
+    <div class="stlist" id="sold-chips"></div>
   </div>
   <div class="orders" id="orders"></div>
 </div>
@@ -1530,9 +1547,39 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (v === "冰") return "pill ice";
     return "pill";
   }
+  /* 品项状态存在 soldout/<品项>：out 售完、wait 要等几分钟以上（10/20/30）、stock 剩余数量（从 stockAt 起算）。只在当天有效。 */
+  function itStat(id) { var s = soldMap[id]; return s && s.day === dayKey() ? s : null; }
+  function itWait(id) { var s = itStat(id), w = s ? Number(s.wait) : 0; return w === 10 || w === 20 || w === 30 ? w : 0; }
+  function waitTxt(w) { return "要等 " + w + " 分钟以上"; }
+  function itUsed(name, since) {
+    var n = 0;
+    todayOrders.forEach(function (o) {
+      if (o.status === "cancelled" || o.id === editingId || !(o.createdAt >= since)) return;
+      (o.lines || []).forEach(function (l) { if (l.name === name) n += Number(l.qty) || 0; });
+    });
+    return n;
+  }
+  /* 还剩几份；没设定数量时回传 null */
+  function stockLeft(id) {
+    var s = itStat(id), it = byId[id];
+    if (!s || !it || typeof s.stock !== "number" || !(s.stock >= 0)) return null;
+    return Math.max(0, s.stock - itUsed(it.name, Number(s.stockAt) || 0));
+  }
+  function anyStock() { return MENU.some(function (it) { var s = itStat(it.id); return !!s && typeof s.stock === "number"; }); }
+  function cartQty(id) { var n = 0; cart.forEach(function (l) { if (l.itemId === id) n += l.qty; }); return n; }
+  /* 这个品项最多还能再加几份到单子里（没限量时是 20） */
+  function roomFor(id) { var left = stockLeft(id); return left === null ? 20 : Math.max(0, left - cartQty(id)); }
+  function stockOver() {
+    var msg = "";
+    MENU.forEach(function (it) {
+      var left = stockLeft(it.id), q = cartQty(it.id);
+      if (left !== null && q > left && !msg) msg = it.name + " 只剩 " + left + " " + it.unit + "，单子里有 " + q + " " + it.unit + "，请先减少数量。";
+    });
+    return msg;
+  }
   function isSold(id) {
-    var s = soldMap[id];
-    return !!(s && s.out && s.day === dayKey());
+    var s = itStat(id);
+    return !!(s && s.out) || stockLeft(id) === 0;
   }
   function setConn(which, state, text) {
     $("#conn-" + which).setAttribute("data-state", state);
@@ -1615,11 +1662,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
   /* ---------- 点餐端：大按钮的菜单 ---------- */
   function tileHTML(it) {
-    var s = isSold(it.id);
+    var s = isSold(it.id), tw = s ? 0 : itWait(it.id), tl = s ? null : stockLeft(it.id);
     return '<button type="button" class="tile' + (s ? " sold" : "") + '" data-act="pick-open" data-id="' + esc(it.id) + '"' + (s ? " disabled" : "") + ">" +
       '<span class="t-name">' + esc(it.name) + "</span>" +
       '<span class="t-price">' + fm(it.price) + "／" + esc(it.unit) + "</span>" +
       (it.fixed ? '<span class="t-note">只有' + esc(it.fixed) + "</span>" : "") +
+      (tw ? '<span class="t-wait">' + waitTxt(tw) + "</span>" : "") +
+      (tl !== null ? '<span class="t-left">剩 ' + tl + " " + esc(it.unit) + "</span>" : "") +
       '<span class="t-state">' + (s ? "已售完" : "点我选择") + "</span></button>";
   }
   function renderMenuTiles() {
@@ -1659,18 +1708,24 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }).join("") +
       '<div class="pk-group"><p class="pk-label">特制备注（可不填）</p><input class="inp pk-input" id="pk-note" maxlength="40" placeholder="例如：快一点、分开装、不要切" value="' + esc(pick.note || "") + '"></div>';
     var sold = isSold(it.id);
+    var pLeft = stockLeft(it.id), pRoom = roomFor(it.id), pWait = itWait(it.id);
+    if (pRoom >= 1 && pick.qty > pRoom) pick.qty = pRoom;
+    if (!sold && pRoom < 1) sold = true;
     $("#pick-body").innerHTML = (it.fixed ? '<p class="pk-note">这个品项只有「' + esc(it.fixed) + "」。</p>" : "") +
+      (pWait ? '<p class="pk-warn">' + esc(it.name) + " " + waitTxt(pWait) + "</p>" : "") +
+      (pLeft !== null ? '<p class="pk-warn">只剩 ' + pLeft + " " + esc(it.unit) + (cartQty(it.id) ? "（单子里已有 " + cartQty(it.id) + " " + esc(it.unit) + "）" : "") + "</p>" : "") +
       groups +
       '<div class="pk-foot"><div class="pk-qty"><button type="button" class="qbtn" data-act="pk-dec" aria-label="减少">−</button>' +
       '<span class="qnum">' + pick.qty + "<small>" + esc(it.unit) + "</small></span>" +
       '<button type="button" class="qbtn" data-act="pk-inc" aria-label="增加">+</button></div>' +
       '<button type="button" class="pk-add" data-act="pk-add"' + (sold ? " disabled" : "") + ">" +
-      (sold ? "这个已经售完了" : "加入 " + fm(pick.qty * (it.price + pickAddOn(it)))) + "</button></div>";
+      (sold ? (pLeft ? "不能再加了" : "这个已经售完了") : "加入 " + fm(pick.qty * (it.price + pickAddOn(it)))) + "</button></div>";
   }
   function openPick(id) {
     var it = byId[id];
     if (!it) return;
     if (isSold(id)) { showToast(it.name + " 已经售完了", false, false, 2200); return; }
+    if (roomFor(id) < 1) { showToast(it.name + " 只剩 " + stockLeft(id) + " " + it.unit + "，都已经在单子里了", false, false, 3000); return; }
     var opts = {};
     it.groups.forEach(function (g) { if (!g.multi) opts[g.key] = g.options[0].v; });
     pick = { id: id, qty: 1, opts: opts, extras: [], note: "" };
@@ -1682,6 +1737,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (!pick) return;
     var it = byId[pick.id];
     if (!it || isSold(it.id)) return;
+    if (pick.qty > roomFor(it.id)) { showToast(it.name + " 只剩 " + stockLeft(it.id) + " " + it.unit, false, false, 3000); renderPick(); return; }
     var opts = [];
     it.groups.forEach(function (g) {
       if (g.multi) { g.options.forEach(function (o) { if (pick.extras.indexOf(o.v) >= 0) opts.push(o.v); }); }
@@ -1735,25 +1791,56 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   }
 
   /* ---------- 售完（只在出餐端切换） ---------- */
-  function renderSoldPanel() {
-    var box = $("#sold-chips");
-    if (!box) return;
-    var blocked = !!writeNotice();
-    box.innerHTML = MENU.map(function (it) {
-      var s = isSold(it.id);
-      return '<button type="button" id="ksold-' + esc(it.id) + '" class="tog" data-act="sold-toggle" data-id="' + esc(it.id) + '" aria-pressed="' + s + '"' + (blocked ? " disabled" : "") + ">" +
-        esc(it.name) + " · " + (s ? "已售完" : "有货") + "</button>";
+  function statRowHTML(it, pre, dis) {
+    var s = isSold(it.id), w = itWait(it.id), left = stockLeft(it.id), id = esc(it.id);
+    var wo = [[0, "正常"], [10, "10 分钟以上"], [20, "20 分钟以上"], [30, "30 分钟以上"]].map(function (o) {
+      return '<option value="' + o[0] + '"' + (o[0] === w ? " selected" : "") + ">" + esc(qT(o[1])) + "</option>";
     }).join("");
+    return '<div class="st-row"><b class="st-name">' + esc(it.name) + "</b>" +
+      '<button type="button" id="' + pre + "sold-" + id + '" class="tog" data-act="sold-toggle" data-id="' + id + '" aria-pressed="' + s + '"' + dis + ">" + (s ? "已售完" : "有货") + "</button>" +
+      '<label class="st-f"><span>要等</span><select class="inp st-wait" data-id="' + id + '"' + dis + ">" + wo + "</select></label>" +
+      '<label class="st-f"><span>剩余</span><input class="inp st-stock" type="number" min="0" max="9999" inputmode="numeric" placeholder="不限" data-id="' + id + '" value="' + (left === null ? "" : left) + '"' + dis + "><span>" + esc(it.unit) + "</span></label>" +
+      '<button type="button" class="btn-sm" data-act="stock-set" data-id="' + id + '"' + dis + ">设定</button>" +
+      (left !== null ? '<button type="button" class="btn-sm" data-act="stock-clear" data-id="' + id + '"' + dis + ">不限量</button>" : "") + "</div>";
   }
-  async function toggleSold(id) {
+  function renderSoldPanel() {
+    var dis = writeNotice() ? " disabled" : "";
+    [["#sold-chips", "k"], ["#sold-chips-o", "o"]].forEach(function (p) {
+      var box = $(p[0]);
+      if (!box) return;
+      var a = document.activeElement;   /* 正在输入数量或选等候时间时，不要重画把它盖掉 */
+      if (a && box.contains(a) && (a.classList.contains("st-stock") || a.classList.contains("st-wait"))) return;
+      box.innerHTML = MENU.map(function (it) { return statRowHTML(it, p[1], dis); }).join("");
+    });
+  }
+  async function saveStat(id, patch, msg) {
     if (!db || writeNotice() || !byId[id]) return;
-    var next = !isSold(id);
+    var s = itStat(id) || {};
+    var d = { out: !!s.out, day: dayKey(), at: Date.now(), wait: itWait(id) };
+    if (typeof s.stock === "number") { d.stock = s.stock; d.stockAt = Number(s.stockAt) || 0; }
+    Object.keys(patch).forEach(function (k) { if (patch[k] === null) delete d[k]; else d[k] = patch[k]; });
     try {
-      await db.doc("soldout/" + id).set({ out: next, day: dayKey(), at: Date.now() });
-      showToast(byId[id].name + (next ? " 已标记售完" : " 已恢复供应"), false, false);
+      await db.doc("soldout/" + id).set(d);
+      showToast(byId[id].name + msg, false, false, 2600);
     } catch (e) {
       showToast("没有改成，请再按一次", false, false);
     }
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    renderSoldPanel();
+  }
+  function toggleSold(id) {
+    if (!byId[id]) return;
+    var next = !isSold(id);
+    /* 恢复供应时，如果是因为剩余数量归零才售完的，一并取消限量 */
+    return saveStat(id, next ? { out: true } : (stockLeft(id) === 0 ? { out: false, stock: null, stockAt: null } : { out: false }), next ? " 已标记售完" : " 已恢复供应");
+  }
+  function setStock(id, raw) {
+    var it = byId[id]; if (!it) return;
+    var v = String(raw === undefined || raw === null ? "" : raw).trim();
+    if (v === "") return saveStat(id, { stock: null, stockAt: null }, " 不限量了");
+    var n = Math.round(Number(v));
+    if (!(n >= 0 && n <= 9999)) { showToast("剩余数量请填 0 到 9999", false, false, 2600); return; }
+    return saveStat(id, { stock: n, stockAt: Date.now(), out: false }, " 剩余数量设为 " + n + " " + it.unit);
   }
 
   /* ---------- 购物车画面 ---------- */
@@ -1761,7 +1848,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var it = byId[l.itemId];
     if (!it) return "";
     return '<li class="line"><div class="line-main"><div class="line-name">' + esc(it.name) + '</div><div class="line-opts">' + esc(l.text) +
-      (isSold(l.itemId) ? ' <span class="soldmark">已售完</span>' : "") + "</div></div>" +
+      (isSold(l.itemId) ? ' <span class="soldmark">已售完</span>' : itWait(l.itemId) ? ' <span class="soldmark">' + waitTxt(itWait(l.itemId)) + "</span>" : "") + "</div></div>" +
       '<span class="line-price">' + fm(l.qty * (it.price + (l.add || 0))) + "</span>" +
       '<div class="stepper"><button type="button" class="step" data-act="l-dec" data-i="' + i + '" aria-label="减少">−</button>' +
       '<span class="qty">' + l.qty + "</span>" +
@@ -1948,6 +2035,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var cu = isCust();
     if (cu && !acceptOpen()) { sendError = acceptMsg(); renderSheet(); return; }
     if (cu && !custTable && !editingId) { var qb = queueBlock(); if (qb) { sendError = qb; renderSheet(); return; } }
+    var overMsg = stockOver();
+    if (overMsg) { sendError = overMsg; renderSheet(); return; }
     var soldNames = cart.filter(function (l) { return isSold(l.itemId); }).map(function (l) { return byId[l.itemId].name; });
     if (soldNames.length) {
       sendError = soldNames.join("、") + " 已售完，请先从单子里去掉。";
@@ -2073,7 +2162,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   function ensureFeeds() {
     if (!sharedStarted || !ready || !db) return;
     if (currentView === "admin" && !adminFeedOn) { adminFeedOn = true; startAdminFeed(); }
-    if ((currentView === "order" || currentView === "cust" || currentView === "board" || currentView === "qr") && !ordersFeedOn) { ordersFeedOn = true; startOrdersFeed(); }
+    /* 出餐端平常不读整天的订单；有品项设了剩余数量时才需要（用来算还剩几份） */
+    if ((currentView === "order" || currentView === "cust" || currentView === "board" || currentView === "qr" || (currentView === "kitchen" && anyStock())) && !ordersFeedOn) { ordersFeedOn = true; startOrdersFeed(); }
   }
   function startShared() {
     if (sharedStarted || !ready || !db) return;
@@ -2111,6 +2201,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       var m = {};
       snap.docs.forEach(function (d) { m[d.id] = d.data(); });
       soldMap = m;
+      ensureFeeds();
       renderMenuTiles();
       renderSoldPanel();
       if (pick) renderPick();
@@ -2129,6 +2220,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       });
       updateOrdersCount(); renderCollect(); notifyCollect();
       renderEta(); maybeLearnEta();
+      if (anyStock()) { renderMenuTiles(); renderSoldPanel(); if (pick) renderPick(); }
       renderBoard(); if (isCust()) { renderCustMine(); if (!$("#sheet").hidden && sheetView === "done") renderSheet(); }
       if (!$("#sheet").hidden && sheetView === "orders") renderSheet();
     }, function () {});
@@ -3097,11 +3189,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       pick.qty = Math.max(1, pick.qty - 1); renderPick();
     } else if (act === "pk-inc") {
       if (!pick) return;
-      pick.qty = Math.min(20, pick.qty + 1); renderPick();
+      var pkMax = Math.min(20, roomFor(pick.id));
+      if (pick.qty >= pkMax && pkMax < 20) showToast("只剩 " + stockLeft(pick.id) + " " + byId[pick.id].unit + "，不能再加了", false, false, 2200);
+      pick.qty = Math.max(1, Math.min(pkMax, pick.qty + 1)); renderPick();
     } else if (act === "pk-add") {
       pickAdd();
     } else if (act === "sold-toggle") {
       toggleSold(t.getAttribute("data-id"));
+    } else if (act === "stock-set") {
+      var sRow = t.closest(".st-row"), sInp = sRow ? sRow.querySelector(".st-stock") : null;
+      setStock(t.getAttribute("data-id"), sInp ? sInp.value : "");
+    } else if (act === "stock-clear") {
+      setStock(t.getAttribute("data-id"), "");
     } else if (act === "open") {
       openSheet("cart");
     } else if (act === "orders-open") {
@@ -3120,6 +3219,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       sendError = "";
       rerenderKeepScroll();
     } else if (act === "l-dec" || act === "l-inc") {
+      if (act === "l-inc" && roomFor(cart[ix].itemId) < 1) { showToast(byId[cart[ix].itemId].name + " 只剩 " + stockLeft(cart[ix].itemId) + " " + byId[cart[ix].itemId].unit + "，不能再加了", false, false, 2600); return; }
       cart[ix].qty += act === "l-inc" ? 1 : -1;
       if (cart[ix].qty < 1) cart.splice(ix, 1);
       sendError = "";
@@ -3329,6 +3429,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   }
   document.addEventListener("input", function (e) { if (e.target && e.target.hasAttribute && e.target.hasAttribute("data-shop")) shopDirty = true; });
   document.addEventListener("change", function (e) { if (e.target && e.target.id === "qr-which") renderQr(); });
+  document.addEventListener("change", function (e) {
+    var el = e.target;
+    if (!el || !el.classList || !el.classList.contains("st-wait")) return;
+    var w = Number(el.value) || 0;
+    saveStat(el.getAttribute("data-id"), { wait: w }, w ? " " + waitTxt(w) : " 等候恢复正常");
+  });
+  document.addEventListener("keydown", function (e) {
+    var el = e.target;
+    if (e.key === "Enter" && el && el.classList && el.classList.contains("st-stock")) { e.preventDefault(); setStock(el.getAttribute("data-id"), el.value); }
+  });
   document.addEventListener("input", onPickupTime);
   document.addEventListener("change", onPickupTime);
   document.addEventListener("submit", function (e) {
