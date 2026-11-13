@@ -401,6 +401,10 @@ html:not([lang^="zh"]):not([lang="ja"]) .tile strong, html:not([lang^="zh"]):not
 }
 .board { min-height: 100vh; background: #10231c; color: #fff; padding: 18px clamp(12px, 3vw, 40px) 28px; display: flex; flex-direction: column; gap: 16px; }
 .board[hidden] { display: none; }
+.etabar { margin: 0; padding: 10px 14px; border-radius: 12px; background: var(--accent-soft, #e3f1ec); color: var(--ink); font-size: 17px; }
+.beta { font-size: clamp(16px, 2.4vw, 28px); color: #fff; opacity: .92; }
+.qr-big .tb-card { max-width: 360px; margin: 0 auto; }
+.qr-big .tb-card svg { width: 100%; height: auto; }
 .bhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .bhead h1 { color: #fff; font-family: var(--font-display); font-size: clamp(30px, 5vw, 56px); margin: 0; }
 .bmeta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -471,12 +475,33 @@ body { background-image: var(--sky, none); background-attachment: fixed; }
   <div class="home-grid">
     <a class="big-link primary" href="#order"><strong>点餐</strong><span>帮客人点餐、送出订单</span></a>
     <a class="big-link" href="#kitchen"><strong>出餐</strong><span>看订单、做好后消掉</span></a>
+    <a class="big-link" href="#qr"><strong>客人扫码</strong><span>出示 QR 码给客人点餐，开放或停止扫码点单</span></a>
     <a class="big-link" href="#board"><strong>出餐看板</strong><span>给客人看的出餐进度画面</span></a>
     <a class="big-link" href="#net"><strong>连线设定</strong><span>网络模式，或不用外网的 WiFi 本地模式</span></a>
     <a class="big-link" href="#admin"><strong>管理</strong><span>统计、菜单与价格、密码（需要密码）</span></a>
   </div>
   <p class="help" id="net-status" hidden></p>
   <p class="help">每天午夜十二点，今天的订单会自动清空，号码从 001 重新开始。</p>
+</div>
+
+<!-- 客人扫码页（给客人扫的 QR 码） -->
+<div class="wrap w-narrow" id="v-qr" hidden>
+  <header>
+    <div class="titles">
+      <a class="back" href="#">← 首页</a>
+      <h1 class="brand">客人扫码</h1>
+    </div>
+  </header>
+  <div class="card stack">
+    <p class="note" id="qr-state"></p>
+    <button type="button" class="send" id="qr-toggle" data-act="accept-toggle">开始接受扫码点单</button>
+    <label class="fld"><span>给哪里的客人扫？</span><select class="inp" id="qr-which"></select></label>
+    <p class="note" id="qr-warn" hidden></p>
+    <div class="qr-big" id="qr-big"></div>
+    <p class="etabar" id="qr-eta"></p>
+    <div class="ord-actions"><button type="button" class="btn-sm" data-act="qr-print">打印这张 QR 码</button></div>
+    <p class="note">QR 码的网址、排队人数上限、自动开放时间和桌位整批打印，都在「管理 → 客人扫码点餐」设定。</p>
+  </div>
 </div>
 
 <!-- 客人扫码点餐 -->
@@ -489,6 +514,7 @@ body { background-image: var(--sky, none); background-attachment: fixed; }
   </header>
   <div class="tools" id="cust-tools"></div>
   <div class="closedbox" id="cust-closed" hidden></div>
+  <p class="etabar" id="cust-eta" hidden></p>
   <div class="custmine" id="cust-mine" hidden></div>
   <div id="cust-menu">
   <p class="hint">点选想吃的，选好口味和数量，再按下方「看我的点单」送出。</p>
@@ -508,6 +534,7 @@ body { background-image: var(--sky, none); background-attachment: fixed; }
   <div class="bhead">
     <h1 id="board-shop">出餐进度</h1>
     <div class="bmeta">
+      <span class="beta" id="board-eta"></span>
       <span class="bclock" id="board-clock"></span>
       <button type="button" class="ghost" id="board-sound" data-act="board-sound">提示音：关</button>
       <button type="button" class="ghost" data-act="board-full">全屏</button>
@@ -540,6 +567,7 @@ body { background-image: var(--sky, none); background-attachment: fixed; }
     </div>
   </header>
   <p class="hint">先点一个品项，选口味和数量，再按「加入订单」。</p>
+  <p class="etabar" id="order-eta"></p>
   <div class="tools">
     <span class="conn" id="conn-order" data-state="wait"><span class="dot"></span><span id="conn-order-text">连线中…</span></span>
     <span class="sizes" role="radiogroup" aria-label="画面大小"><span class="sz-l">画面大小</span><button type="button" class="chip sz" role="radio" aria-checked="false" data-act="size" data-value="xs">特小</button><button type="button" class="chip sz" role="radio" aria-checked="false" data-act="size" data-value="s">小</button><button type="button" class="chip sz" role="radio" aria-checked="false" data-act="size" data-value="m">中</button><button type="button" class="chip sz" role="radio" aria-checked="false" data-act="size" data-value="l">大</button><button type="button" class="chip sz" role="radio" aria-checked="true" data-act="size" data-value="xl">特大</button></span>
@@ -658,6 +686,9 @@ body { background-image: var(--sky, none); background-attachment: fixed; }
         <label class="fld"><span>店家币别（菜单价格、收款、统计都用这个币别）</span><select class="inp" id="shop-cur" data-shop></select></label>
         <label class="fld"><span>付款方式（用顿号或逗号分开；「现金」固定在第一个）</span><input class="inp" id="shop-pay" type="text" autocomplete="off" data-shop></label>
         <label class="fld" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="shop-conv" checked> <span>更换币别时，一并把目前菜单的价格依汇率换算</span></label>
+        <label class="fld"><span>平均出餐时间（分钟／每张单，预设 2；客人和出餐看板的预计等候用它估算）</span><input class="inp" id="shop-eta" type="number" min="0.5" max="30" step="0.5" inputmode="decimal" data-shop></label>
+        <label class="fld" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="shop-etaauto" data-shop checked> <span>上线后由系统用实际出餐时间自动校正</span></label>
+        <p class="note" id="shop-etanow"></p>
         <div class="fld"><span>店家风格（点一下可预览，按「储存店家设置」才会套用到所有设备）</span><div class="skins" id="shop-skins"></div></div>
         <p class="err" id="shop-msg" hidden></p>
         <button type="button" class="send" data-act="shop-save">储存店家设置</button>
@@ -1166,7 +1197,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   /* ---------- 店家设置：店名、币别、付款方式 ---------- */
   var shop = { name: "", cur: "TWD", pay: [], qlim: 35, qcap: 150, skin: "default", qopen: false, qfrom: "", qto: "" };
   var storeId = "";
-  var urlStore = (/\/s-([A-Z2-9]{6,12})$/.exec(location.hash) || [])[1] || "";
+  var ETA_DEF = 2;
+  var urlRaw = (/\/s-([A-Z2-9]{6,12}|-)$/.exec(location.hash) || [])[1] || "";
+  var urlHas = !!urlRaw;               /* 网址里带了店家标记（"-" 表示旧版单店） */
+  var urlStore = urlRaw === "-" ? "" : urlRaw;
   var SKINS = [{"id":"default","name":"清新绿（预设）","deco":"","dark":0},{"id":"rat","name":"鼠（生肖）","deco":"🐭","dark":0,"bg":"#F2F3F8","surface":"#FFFFFF","ink":"#0F121F","muted":"#222845","line":"#C9CEE1","accent":"#4C5A9A","on":"#FFFFFF","soft":"#DFE1ED"},{"id":"ox","name":"牛（生肖）","deco":"🐮","dark":0,"bg":"#F7F3F1","surface":"#FFFFFF","ink":"#1C120A","muted":"#3E2817","line":"#DCCEC2","accent":"#8A5A33","on":"#FFFFFF","soft":"#EAE1DA"},{"id":"tiger","name":"虎（生肖）","deco":"🐯","dark":0,"bg":"#FAF3EE","surface":"#FFFFFF","ink":"#241002","muted":"#502405","line":"#E8CAB6","accent":"#B2500B","on":"#FFFFFF","soft":"#F1E0D3"},{"id":"rabbit","name":"兔（生肖）","deco":"🐰","dark":0,"bg":"#FAF3F5","surface":"#FFFFFF","ink":"#231017","muted":"#502433","line":"#E8CAD4","accent":"#B15071","on":"#FFFFFF","soft":"#F1E0E5"},{"id":"dragon","name":"龙（生肖）","deco":"🐲","dark":0,"bg":"#F9F1EF","surface":"#FFFFFF","ink":"#220A06","muted":"#4C160E","line":"#E5C2BC","accent":"#A8321F","on":"#FFFFFF","soft":"#EFDAD7"},{"id":"snake","name":"蛇（生肖）","deco":"🐍","dark":0,"bg":"#F2F6F1","surface":"#FFFFFF","ink":"#0D190C","muted":"#1C381A","line":"#C5D8C4","accent":"#3F7D3A","on":"#FFFFFF","soft":"#DCE8DC"},{"id":"horse","name":"马（生肖）","deco":"🐴","dark":0,"bg":"#F8F5EF","surface":"#FFFFFF","ink":"#1F1505","muted":"#46300B","line":"#E1D3BA","accent":"#9B6B18","on":"#FFFFFF","soft":"#EDE4D5"},{"id":"goat","name":"羊（生肖）","deco":"🐑","dark":0,"bg":"#F2F6F5","surface":"#FFFFFF","ink":"#0F1915","muted":"#213930","line":"#C8D9D3","accent":"#497F6B","on":"#FFFFFF","soft":"#DEE8E4"},{"id":"monkey","name":"猴（生肖）","deco":"🐵","dark":0,"bg":"#F6F4F9","surface":"#FFFFFF","ink":"#191221","muted":"#38294B","line":"#D8CEE4","accent":"#7D5BA6","on":"#FFFFFF","soft":"#E8E1EF"},{"id":"rooster","name":"鸡（生肖）","deco":"🐔","dark":0,"bg":"#FBF2EF","surface":"#FFFFFF","ink":"#270D06","muted":"#571E0D","line":"#ECC7BB","accent":"#C1431C","on":"#FFFFFF","soft":"#F4DDD6"},{"id":"dog","name":"狗（生肖）","deco":"🐶","dark":0,"bg":"#F0F5F9","surface":"#FFFFFF","ink":"#091522","muted":"#15304C","line":"#C1D2E5","accent":"#2F6AA8","on":"#FFFFFF","soft":"#DAE4EF"},{"id":"pig","name":"猪（生肖）","deco":"🐷","dark":0,"bg":"#FAF3F4","surface":"#FFFFFF","ink":"#241114","muted":"#50252D","line":"#E8CBD1","accent":"#B25365","on":"#FFFFFF","soft":"#F1E0E3"},{"id":"star","name":"星辰","deco":"✨","dark":1,"bg":"#0B1026","surface":"#151B3A","ink":"#EAF0FF","muted":"#B6C0EA","line":"#2E3868","accent":"#9FB0FF","on":"#0B1026","soft":"#232B5C","sky":"radial-gradient(1.5px 1.5px at 12% 18%,#fff 50%,transparent 51%),radial-gradient(1px 1px at 33% 62%,#cfd8ff 50%,transparent 51%),radial-gradient(2px 2px at 58% 24%,#fff 50%,transparent 51%),radial-gradient(1px 1px at 76% 71%,#fff 50%,transparent 51%),radial-gradient(1.5px 1.5px at 90% 12%,#dfe6ff 50%,transparent 51%),radial-gradient(1px 1px at 45% 88%,#fff 50%,transparent 51%),radial-gradient(1px 1px at 8% 80%,#cfd8ff 50%,transparent 51%)"},{"id":"moon","name":"月光","deco":"🌙","dark":1,"bg":"#14181F","surface":"#1D232D","ink":"#F1EEE4","muted":"#C2BEB0","line":"#3A4150","accent":"#E8D48A","on":"#14181F","soft":"#2B3342"},{"id":"ocean","name":"海洋","deco":"🌊","dark":0,"bg":"#EDF6FA","surface":"#FFFFFF","ink":"#0F2E3D","muted":"#436172","line":"#BBD6E2","accent":"#0B6E8A","on":"#FFFFFF","soft":"#D3EAF2"},{"id":"sakura","name":"樱花","deco":"🌸","dark":0,"bg":"#FDF2F5","surface":"#FFFFFF","ink":"#4A2531","muted":"#7C5361","line":"#F1CBD7","accent":"#B83A62","on":"#FFFFFF","soft":"#F9DCE5"},{"id":"coffee","name":"咖啡","deco":"☕","dark":0,"bg":"#F6EFE8","surface":"#FFFFFF","ink":"#3A2618","muted":"#6D5646","line":"#DCCBBB","accent":"#7A4A26","on":"#FFFFFF","soft":"#EBDAC9"},{"id":"wafu","name":"和风","deco":"🎏","dark":0,"bg":"#F4F0E8","surface":"#FFFDF8","ink":"#22201C","muted":"#5A564E","line":"#D6CFC0","accent":"#9C2B2B","on":"#FFFFFF","soft":"#EBDDD0"},{"id":"neon","name":"夜市霓虹","deco":"🏮","dark":1,"bg":"#120D1F","surface":"#1C1530","ink":"#FBEFFF","muted":"#CDB8E6","line":"#3D2D5E","accent":"#FF7AD1","on":"#1A0E22","soft":"#2E2050"}];
   function hexMix(a, b, t) {
     function c(h) { h = h.replace("#", ""); return [0, 2, 4].map(function (i) { return parseInt(h.substr(i, 2), 16); }); }
@@ -1203,7 +1237,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     return "店家目前还没开始接受扫码点单。开放后再扫一次这个 QR 码就能点餐。";
   }
   function shopDocData(extra) {
-    var o = { name: shop.name, cur: shop.cur, pay: shop.pay, qlim: shop.qlim, qcap: shop.qcap, skin: shop.skin, qopen: !!shop.qopen, qfrom: shop.qfrom || "", qto: shop.qto || "", setup: true, updatedAt: Date.now() };
+    var o = { name: shop.name, cur: shop.cur, pay: shop.pay, qlim: shop.qlim, qcap: shop.qcap, skin: shop.skin, qopen: !!shop.qopen, qfrom: shop.qfrom || "", qto: shop.qto || "", eta: shop.eta || 0, etaAuto: shop.etaAuto || 0, etaPrior: shop.etaPrior || 0, etaAutoDay: shop.etaAutoDay || "", etaAutoOn: shop.etaAutoOn !== false, setup: true, updatedAt: Date.now() };
     Object.keys(extra || {}).forEach(function (k) { o[k] = extra[k]; });
     return o;
   }
@@ -1213,6 +1247,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   }
   function updateAcceptUi() {
     var open = acceptOpen();
+    if (typeof renderQr === "function") renderQr();
     var b = document.getElementById("accept-btn"); if (b) b.textContent = "扫码点单：" + (open ? "开放中" : shop.qopen ? "未到时间" : "已停止");
     var st = document.getElementById("acc-state");
     if (st) st.innerHTML = "目前状态：<b>" + (open ? "开放中，客人可以扫码点单" : shop.qopen ? "已开启，但不在自动开放时间内" : "已停止，客人扫码后只会看到「尚未开放」") + "</b>";
@@ -1230,13 +1265,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     shop.qfrom = /^\d{2}:\d{2}$/.test(x.qfrom || "") ? x.qfrom : "";
     shop.qto = /^\d{2}:\d{2}$/.test(x.qto || "") ? x.qto : "";
     if (!(typeof shopDirty !== "undefined" && shopDirty)) applySkin(shop.skin);
+    shop.eta = Number(x.eta) >= 0.5 && Number(x.eta) <= 30 ? Number(x.eta) : 0;
+    shop.etaAuto = Number(x.etaAuto) >= 0.5 && Number(x.etaAuto) <= 30 ? Number(x.etaAuto) : 0;
+    shop.etaPrior = Number(x.etaPrior) >= 0.5 && Number(x.etaPrior) <= 30 ? Number(x.etaPrior) : 0;
+    shop.etaAutoDay = typeof x.etaAutoDay === "string" ? x.etaAutoDay : "";
+    shop.etaAutoOn = x.etaAutoOn !== false;
     shop.qlim = Math.max(5, Math.min(55, Math.round(Number(x.qlim)) || 35));
     shop.qcap = Math.max(10, Math.min(500, Math.round(Number(x.qcap)) || 150));
     PAY_METHODS = ["现金"].concat(pm.length ? pm : DEFAULT_PAY.slice(1));
     var h = document.querySelector("#v-home .brand");
     if (h) { if (h.__def === undefined) h.__def = h.textContent; h.textContent = shop.name || h.__def; }
     refreshMoney();
-    renderCustHead(); renderBoard(); updateAcceptUi();
+    renderCustHead(); renderBoard(); updateAcceptUi(); renderEta();
     if (typeof renderShopForm === "function") renderShopForm();
   }
   var shopDirty = false;
@@ -1250,6 +1290,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     $("#shop-name").value = shop.name;
     $("#shop-pay").value = (shop.pay.length ? shop.pay : DEFAULT_PAY.slice(1)).join("、");
     shopSkinSel = shop.skin;
+    var ei = $("#shop-eta"); if (ei) ei.value = shop.eta || ETA_DEF;
+    var ea = $("#shop-etaauto"); if (ea) ea.checked = shop.etaAutoOn !== false;
+    renderEtaNote();
     renderSkinPicker();
     var sc = $("#store-code-box"); if (sc) { sc.hidden = !storeId; $("#store-code").textContent = fullCode(); }
   }
@@ -1269,6 +1312,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var name = $("#shop-name").value.trim().slice(0, 30);
     var cur = $("#shop-cur").value;
     var pay = splitList($("#shop-pay").value).filter(function (m) { return m !== "现金"; });
+    var etaV = Number($("#shop-eta").value);
+    if (!(etaV >= 0.5 && etaV <= 30)) { say("平均出餐时间请填 0.5 到 30 分钟。", true); return; }
+    var etaOn = $("#shop-etaauto").checked;
+    var etaChanged = Math.abs(etaV - (shop.eta || ETA_DEF)) > 0.001;
     if (pay.length > 8) { say("付款方式最多 8 个（现金固定在第一个）。", true); return; }
     if (pay.some(function (m) { return m.length > 14; })) { say("每个付款方式名称请在 14 个字以内。", true); return; }
     try {
@@ -1277,7 +1324,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         var conv = ITEMS.map(function (it) { return convItem(it, from, cur); });
         await db.doc("config/menu").set({ items: conv, updatedAt: Date.now() });
       }
-      await db.doc("config/shop").set(shopDocData({ name: name, cur: cur, pay: pay, skin: shopSkinSel }));
+      await db.doc("config/shop").set(shopDocData(Object.assign({ name: name, cur: cur, pay: pay, skin: shopSkinSel, eta: etaV, etaAutoOn: etaOn }, etaChanged ? { etaAuto: 0, etaPrior: 0, etaAutoDay: "" } : {})));
       shopDirty = false;
       say("已储存。" + (cur !== shop.cur ? "（币别已更换；已有订单和统计的数字不会换算。）" : ""), false);
     } catch (e) {
@@ -1764,7 +1811,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           return '<li class="line"><div class="line-main"><div class="line-name">' + esc(l.name) + " × " + l.qty + " " + esc(l.unit) + '</div><div class="line-opts">' + l.opts.map(function (v) { return esc(pillText(v)); }).join(" · ") + '</div></div><span class="line-price">' + fm(l.qty * l.price) + "</span></li>";
         }).join("") + "</ul>" +
         '<p class="total"><span>' + esc(tableLabel(lastOrder.table)) + '</span><b>' + fm(lastOrder.total) + "</b></p>" +
-        '<p class="note">请留意出餐看板或店员叫号。付款请找店员。</p>' +
+        '<p class="note">请留意出餐看板或店员叫号。付款请找店员。</p>' + doneEtaHTML() +
         '<button type="button" id="again" class="send" data-act="again">再点一份</button>';
       return;
     }
@@ -1775,7 +1822,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           return '<li class="line"><div class="line-main"><div class="line-name">' + esc(l.name) + " × " + l.qty + " " + esc(l.unit) + '</div><div class="line-opts">' + l.opts.map(function (v) { return esc(pillText(v)); }).join(" · ") + '</div></div><span class="line-price">' + fm(l.qty * l.price) + "</span></li>";
         }).join("") + "</ul>" +
         '<p class="total"><span>' + esc(dineLabel(lastOrder)) + " · " + lastOrder.cutlery + " · " + lastOrder.bag + '</span><b>' + fm(lastOrder.total) + "</b></p>" +
-        '<button type="button" id="again" class="send" data-act="again">继续点下一单</button>';
+        doneEtaHTML() + '<button type="button" id="again" class="send" data-act="again">继续点下一单</button>';
       return;
     }
     title.textContent = editingId ? "修改 #" + pad(editingNo) : isCust() ? "我的点单" : "我的单子";
@@ -1803,6 +1850,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       '<div class="sendbar"><div class="total"><span>共 ' + total() + " 件</span><b>" + fm(cartTotal()) + "</b></div>" +
       '<button type="button" id="send" class="send" data-act="send"' + (notice || sending ? " disabled" : "") + ">" +
       (sending ? (editingId ? "更新中…" : "送出中…") : (editingId ? "更新订单 #" + pad(editingNo) : "送出订单")) + "</button></div>";
+  }
+  function doneEtaHTML() {
+    if (!lastOrder || lastOrder.edited) return "";
+    var cur = todayOrders.filter(function (x) { return x.id === lastOrder.id; })[0];
+    if (cur && cur.status !== "pending") return "";
+    var m = cur ? etaForOrder(cur) : etaWaitNew().min;
+    return m ? '<p class="note">预计约 <b>' + m + '</b> 分钟后好。</p>' : "";
   }
   function rerenderKeepScroll() {
     var pn = document.querySelector("#sheet .panel");
@@ -2026,12 +2080,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       todayOrders = snap.docs.map(function (d) {
         var x = d.data();
         return {
-          id: d.id, no: x.no, createdAt: x.createdAt, status: x.status, total: x.total, payStatus: x.payStatus || "", payMethod: x.payMethod || "", doneAt: x.doneAt || 0, dine: x.dine, pickupAt: x.pickupAt, phoneTail: x.phoneTail || "", table: x.table || 0, src: x.src || "", shown: x.shown || 0, rush: !!x.rush,
+          id: d.id, no: x.no, createdAt: x.createdAt, status: x.status, total: x.total, payStatus: x.payStatus || "", payMethod: x.payMethod || "", doneAt: x.doneAt || 0, dine: x.dine, pickupAt: x.pickupAt, phoneTail: x.phoneTail || "", table: x.table || 0, src: x.src || "", shown: x.shown || 0, rush: !!x.rush, autoClosed: !!x.autoClosed,
           cutlery: x.cutlery, bag: x.bag, editedAt: x.editedAt,
           lines: (x.lines || []).map(function (l) { return { name: l.name, unit: l.unit, qty: l.qty, opts: l.opts || [], price: l.price }; })
         };
       });
       updateOrdersCount(); renderCollect(); notifyCollect();
+      renderEta(); maybeLearnEta();
       renderBoard(); if (isCust()) { renderCustMine(); if (!$("#sheet").hidden && sheetView === "done") renderSheet(); }
       if (!$("#sheet").hidden && sheetView === "orders") renderSheet();
     }, function () {});
@@ -2940,10 +2995,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   }
   /* ---------- 路由 ---------- */
   function route() {
-    var h = location.hash.replace("#", "").replace(/\/s-[A-Z2-9]{6,12}$/, "");
+    var h = location.hash.replace("#", "").replace(/\/s-(?:[A-Z2-9]{6,12}|-)$/, "");
     var cm = /^cust(?:\/(\d{1,3}))?$/.exec(h) || (h === "queue" ? [h, "0"] : null);
     if (cm) custTable = Number(cm[1] || 0);
-    currentView = cm ? "cust" : h === "board" ? "board" : h === "order" ? "order" : h === "kitchen" ? "kitchen" : h === "admin" ? "admin" : h === "net" ? "net" : "home";
+    currentView = cm ? "cust" : h === "qr" ? "qr" : h === "board" ? "board" : h === "order" ? "order" : h === "kitchen" ? "kitchen" : h === "admin" ? "admin" : h === "net" ? "net" : "home";
     document.body.classList.toggle("is-cust", !!cm);
     if (currentView !== "admin") { adminUnlocked = false; resetAsk = false; edDelAsk = -1; rallAsk = false; rallInput = ""; rallMsg = ""; }
     $("#v-home").hidden = currentView !== "home";
@@ -2952,10 +3007,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     $("#v-admin").hidden = currentView !== "admin";
     $("#v-net").hidden = currentView !== "net";
     $("#v-cust").hidden = currentView !== "cust";
+    $("#v-qr").hidden = currentView !== "qr";
     $("#v-board").hidden = currentView !== "board";
     if (currentView === "cust") { loadMyIds(); renderCustHead(); renderCustMine(); }
     if (currentView === "board") { boardSeen = null; renderBoard(); }
     if (currentView === "net") renderNet();
+    if (currentView === "qr") renderQr();
+    renderEta();
     $("#sheet").hidden = true;
     closePick();
     sheetView = "cart";
@@ -3098,6 +3156,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       makeQueue();
     } else if (act === "tb-qprint") {
       if (!$("#tb-queue").innerHTML) makeQueue(); printCards("#tb-queue");
+    } else if (act === "qr-print") {
+      printCards("#qr-big");
     } else if (act === "accept-toggle") {
       acceptSet(!shop.qopen);
     } else if (act === "accept-sched") {
@@ -3223,6 +3283,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
   }
   document.addEventListener("input", function (e) { if (e.target && e.target.hasAttribute && e.target.hasAttribute("data-shop")) shopDirty = true; });
+  document.addEventListener("change", function (e) { if (e.target && e.target.id === "qr-which") renderQr(); });
   document.addEventListener("input", onPickupTime);
   document.addEventListener("change", onPickupTime);
   document.addEventListener("submit", function (e) {
@@ -3442,7 +3503,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         } else { gateSay("#gate-err", "找不到这家店，请再确认代码。"); $("#gate-pw").value = ""; }
       } catch (er) { gateSay("#gate-err", "连不上资料库（" + (er && er.code || "网络问题") + "）。"); }
     });
-    if (urlStore) { storeId = urlStore; loadFirebaseThen(startApp); return; }
+    if (urlHas) { storeId = urlStore; loadFirebaseThen(startApp); return; }
+    /* 客人或看板没带店家标记（旧的 QR 码）：不要叫客人登入，直接用旧版单店资料 */
+    if (/^#(?:cust|queue|board)/.test(location.hash) && !(function () { try { return localStorage.getItem("xlb-store"); } catch (e) { return ""; } })()) { storeId = ""; loadFirebaseThen(startApp); return; }
     var saved = null, legacy = false;
     try { saved = localStorage.getItem("xlb-store"); legacy = localStorage.getItem("xlbShopOK") === "1"; } catch (e) {}
     if (saved === "-" || (!saved && legacy)) { storeId = ""; loadFirebaseThen(startApp); return; }
@@ -4540,6 +4603,72 @@ var TW_CHARS = "与丑专业丝两个为丽么乌乐习于产仅从们价会传�
   var TW_TO = "與醜專業絲兩個為麗麼烏樂習於產僅從們價會傳體餘儲關養內寫衝決況凍準涼減幾擊則剛刪別動勢區單賣佔滷壓廚參雙發變台葉號後嗎啟員鹹響團圍圖圓塊處備復夠頭夾媽實宮寬對尋盡層屜屆嵐幣帶幫幹並庫應開棄張彈歸當錄徑態總慣掃揚擔擇換攤數斷無時顯機權條來檸標欄樣檔檢櫻歡殘匯漢湯沒淺漿瀏濃溫灣滿燉點煉燒燙熱狀獨豬現電畫鹽蓋盤著碼確種積稱穩籠簡類紅約級線組細經結給絡統繼續綿綜綠編縮網腸膠腦範蕎蘿營薩蔥蝦補裝見規視覽計訂認讓議訊記許設識訴詞試話詢該語誤請諾讀調負貢責敗帳貨購貼資趨車轉輕載較輯輸過運還這進連選醬裡鍾鈕錢鐵銷鎖鍋錯長閉問間閱隊陽際隨隱頁項須頓預顆題額風飯飲餃餅馬驟魚魷鮪鮮雞鴨麥麵黃龍";
   var TW_PHRASES = {"干锅": "乾鍋", "每台手机都要能上网": "每台手機都要能上網", "分钟": "分鐘", "制作": "製作", "這台是主機": "這台是主機", "新增一台设备": "新增一台設備", "传统饭团": "傳統飯糰", "每台手機都要能上網": "每台手機都要能上網", "每台手机都能上网时使用": "每台手機都能上網時使用", "打印": "列印", "而且兩台手機連在同一個": "而且兩台手機連在同一個", "请确认两台设备在同一个": "請確認兩台設備在同一個", "面条": "麵條", "这台是主机": "這台是主機", "每台手機都能上網時使用": "每台手機都能上網時使用", "台湾": "台灣", "屋台": "屋台", "这台手机好像没有连上": "這台手機好像沒有連上", "尽量在": "儘量在", "汤面": "湯麵", "看到重复出现的备注": "看到重複出現的備註", "面筋": "麵筋", "这台手机要做什么": "這台手機要做什麼", "面包": "麵包", "这台设备要退出这家店吗": "這台設備要退出這家店嗎", "吐司炒面小吃店模板": "吐司炒麵小吃店模板", "刀削面": "刀削麵", "與專業絲兩個為麗麼烏樂習於從價會傳體餘儲關養內寫衝決況涼減擊剛刪別動勢區單賣佔滷參雙變台葉號後嗎啟鹹響團圍圖圓塊備復夠頭夾媽實宮寬對層屜嵐帶幫幹並庫應開棄張彈當錄態總慣揚擇換攤數斷無時顯機權條來檸標欄樣檢殘漢湯沒淺漿濃溫灣燉點煉燒燙熱狀獨豬現電畫鹽盤著碼確種積稱穩籠簡類紅約級線組細經結給絡統繼續綿綜綠編縮網腸膠範蘿營薩蔥蝦補裝見計訂認讓議記設詞試話該語請諾讀調負貢責敗帳貨購貼資趨車轉輕載輯輸過還這進連選醬裡鍾鈕錢鐵銷鎖鍋閉間閱陽際隱頁項頓預顆額風飯飲餃餅馬魚魷鮪鮮雞麥麵黃龍": "與專業絲兩個為麗麼烏樂習於從價會傳體餘儲關養內寫衝決況涼減擊剛刪別動勢區單賣佔滷參雙變台葉號後嗎啟鹹響團圍圖圓塊備復夠頭夾媽實宮寬對層屜嵐帶幫幹並庫應開棄張彈當錄態總慣揚擇換攤數斷無時顯機權條來檸標欄樣檢殘漢湯沒淺漿濃溫灣燉點煉燒燙熱狀獨豬現電畫鹽盤著碼確種積稱穩籠簡類紅約級線組細經結給絡統繼續綿綜綠編縮網腸膠範蘿營薩蔥蝦補裝見計訂認讓議記設詞試話該語請諾讀調負貢責敗帳貨購貼資趨車轉輕載輯輸過還這進連選醬裡鍾鈕錢鐵銷鎖鍋閉間閱陽際隱頁項頓預顆額風飯飲餃餅馬魚魷鮪鮮雞麥麵黃龍", "备注": "備註", "新增一台员工手机时": "新增一台員工手機時", "一台主机存资料": "一台主機存資料", "担仔面": "擔仔麵", "会用备份取代这台主机目前所有资料": "會用備份取代這台主機目前所有資料", "制作中": "製作中", "请长按文字手动复制": "請長按文字手動複製", "炒面": "炒麵", "这台加入主机": "這台加入主機", "牛肉面": "牛肉麵", "素饭团": "素飯糰", "饭团店模板": "飯糰店模板", "肉松蛋": "肉鬆蛋", "拌面": "拌麵", "与专业丝两个为丽么乌乐习于从价会传体余储关养内写冲决况凉减击刚删别动势区单卖占卤参双变台叶号后吗启咸响团围图圆块备复够头夹妈实宫宽对层屉岚带帮干并库应开弃张弹当录态总惯扬择换摊数断无时显机权条来柠标栏样检残汉汤没浅浆浓温湾炖点炼烧烫热状独猪现电画盐盘着码确种积称稳笼简类红约级线组细经结给络统继续绵综绿编缩网肠胶范萝营萨葱虾补装见计订认让议记设词试话该语请诺读调负贡责败账货购贴资趋车转轻载辑输过还这进连选酱里钟钮钱铁销锁锅闭间阅阳际隐页项顿预颗额风饭饮饺饼马鱼鱿鲔鲜鸡麦麺黄龙": "與專業絲兩個為麗麼烏樂習於從價會傳體餘儲關養內寫衝決況涼減擊剛刪別動勢區單賣佔滷參雙變台葉號後嗎啟鹹響團圍圖圓塊備復夠頭夾媽實宮寬對層屜嵐帶幫幹並庫應開棄張彈當錄態總慣揚擇換攤數斷無時顯機權條來檸標欄樣檢殘漢湯沒淺漿濃溫灣燉點煉燒燙熱狀獨豬現電畫鹽盤著碼確種積稱穩籠簡類紅約級線組細經結給絡統繼續綿綜綠編縮網腸膠範蘿營薩蔥蝦補裝見計訂認讓議記設詞試話該語請諾讀調負貢責敗帳貨購貼資趨車轉輕載輯輸過還這進連選醬裡鍾鈕錢鐵銷鎖鍋閉間閱陽際隱頁項頓預顆額風飯飲餃餅馬魚魷鮪鮮雞麥麵黃龍", "或把代码复制给主机": "或把代碼複製給主機", "其中一台当": "其中一台當", "台設備": "台設備", "请稍后几分钟再试": "請稍後幾分鐘再試", "或把下面的代码复制给对方": "或把下面的代碼複製給對方", "牛肉炒面": "牛肉炒麵", "資料只存在這台主機的瀏覽器裡": "資料只存在這台主機的瀏覽器裡", "一台主機存資料": "一台主機存資料", "台湾啤酒": "台灣啤酒", "肉松": "肉鬆", "整间店只要一台": "整間店只要一台", "但每台設備都要掃碼配對": "但每台設備都要掃碼配對", "请让这台手机一直开着": "請讓這台手機一直開著", "這台手機的角色": "這台手機的角色", "码或复制贴上": "碼或複製貼上", "面粉": "麵粉", "這台當主機": "這台當主機", "清炖牛肉面": "清燉牛肉麵", "这台手机的角色": "這台手機的角色", "这台设备的角色": "這台設備的角色", "第一次在這台手機打開時需要輸入一次": "第一次在這台手機打開時需要輸入一次", "其中一台當": "其中一台當", "這台手機好像沒有連上": "這台手機好像沒有連上", "台": "台", "麻酱面": "麻醬麵", "整間店只要一台": "整間店只要一台", "與專業絲兩個為麗麼烏樂習於產僅從們價會傳體餘儲關養內寫衝決況凍準涼減幾擊則剛刪別動勢區單賣佔滷壓廚參雙發變台葉號後嗎啟員鹹響團圍圖圓塊處備復夠頭夾媽實宮寬對尋層屜屆嵐幣帶幫幹並庫應開棄張彈歸當錄態總慣掃揚擔擇換攤數斷無時顯機權條來檸標欄樣檔檢歡殘匯漢湯沒淺漿瀏濃溫灣燉點煉燒燙熱狀獨豬現電畫鹽蓋盤著碼確種積稱穩籠簡類紅約級線組細經結給絡統繼續綿綜綠編縮網腸膠腦範蕎蘿營薩蔥蝦補裝見覽計訂認讓議訊記許設識詞試話該語誤請諾讀調負貢責敗帳貨購貼資趨車轉輕載較輯輸過運還這進連選醬裡鍾鈕錢鐵銷鎖鍋錯長閉間閱陽際隱頁項須頓預顆額風飯飲餃餅馬驟魚魷鮪鮮雞鴨麥麵黃龍": "與專業絲兩個為麗麼烏樂習於產僅從們價會傳體餘儲關養內寫衝決況凍準涼減幾擊則剛刪別動勢區單賣佔滷壓廚參雙發變台葉號後嗎啟員鹹響團圍圖圓塊處備復夠頭夾媽實宮寬對尋層屜屆嵐幣帶幫幹並庫應開棄張彈歸當錄態總慣掃揚擔擇換攤數斷無時顯機權條來檸標欄樣檔檢歡殘匯漢湯沒淺漿瀏濃溫灣燉點煉燒燙熱狀獨豬現電畫鹽蓋盤著碼確種積稱穩籠簡類紅約級線組細經結給絡統繼續綿綜綠編縮網腸膠腦範蕎蘿營薩蔥蝦補裝見覽計訂認讓議訊記許設識詞試話該語誤請諾讀調負貢責敗帳貨購貼資趨車轉輕載較輯輸過運還這進連選醬裡鍾鈕錢鐵銷鎖鍋錯長閉間閱陽際隱頁項須頓預顆額風飯飲餃餅馬驟魚魷鮪鮮雞鴨麥麵黃龍", "这台设备透过浏览器连到店里的主机": "這台設備透過瀏覽器連到店裡的主機", "分钟订单数直条图": "分鐘訂單數直條圖", "一并把目前菜单的价格依汇率换算": "一併把目前菜單的價格依匯率換算", "每台手机自己记住": "每台手機自己記住", "凉面": "涼麵", "榨菜肉丝面": "榨菜肉絲麵", "但每台设备都要扫码配对": "但每台設備都要掃碼配對", "这台设备退出这家店": "這台設備退出這家店", "會用備份取代這台主機目前所有資料": "會用備份取代這台主機目前所有資料", "台灣": "台灣", "这台当主机": "這台當主機", "這台手機要做什麼": "這台手機要做什麼", "這台設備透過瀏覽器連到店裡的主機": "這台設備透過瀏覽器連到店裡的主機", "請確認兩台設備在同一個": "請確認兩台設備在同一個", "這台手機的": "這台手機的", "复制": "複製", "肉松蛋饭团": "肉鬆蛋飯糰", "与专业丝两个为丽么乌乐习于产仅从们价会传体余储关养内写冲决况冻准凉减几击则刚删别动势区单卖占卤压厨参双发变台叶号后吗启员咸响团围图圆块处备复够头夹妈实宫宽对寻层屉届岚币带帮干并库应开弃张弹归当录态总惯扫扬担择换摊数断无时显机权条来柠标栏样档检欢残汇汉汤没浅浆浏浓温湾炖点炼烧烫热状独猪现电画盐盖盘着码确种积称稳笼简类红约级线组细经结给络统继续绵综绿编缩网肠胶脑范荞萝营萨葱虾补装见览计订认让议讯记许设识词试话该语误请诺读调负贡责败账货购贴资趋车转轻载较辑输过运还这进连选酱里钟钮钱铁销锁锅错长闭间阅阳际隐页项须顿预颗额风饭饮饺饼马骤鱼鱿鲔鲜鸡鸭麦麺黄龙": "與專業絲兩個為麗麼烏樂習於產僅從們價會傳體餘儲關養內寫衝決況凍準涼減幾擊則剛刪別動勢區單賣佔滷壓廚參雙發變台葉號後嗎啟員鹹響團圍圖圓塊處備復夠頭夾媽實宮寬對尋層屜屆嵐幣帶幫幹並庫應開棄張彈歸當錄態總慣掃揚擔擇換攤數斷無時顯機權條來檸標欄樣檔檢歡殘匯漢湯沒淺漿瀏濃溫灣燉點煉燒燙熱狀獨豬現電畫鹽蓋盤著碼確種積稱穩籠簡類紅約級線組細經結給絡統繼續綿綜綠編縮網腸膠腦範蕎蘿營薩蔥蝦補裝見覽計訂認讓議訊記許設識詞試話該語誤請諾讀調負貢責敗帳貨購貼資趨車轉輕載較輯輸過運還這進連選醬裡鍾鈕錢鐵銷鎖鍋錯長閉間閱陽際隱頁項須頓預顆額風飯飲餃餅馬驟魚魷鮪鮮雞鴨麥麵黃龍", "请改用复制贴上": "請改用複製貼上", "新增一台設備": "新增一台設備", "阳春面": "陽春麵", "意大利面": "義大利麵", "萝卜糕": "蘿蔔糕", "請讓這台手機一直開著": "請讓這台手機一直開著", "烧肉蛋饭团": "燒肉蛋飯糰", "而且两台手机连在同一个": "而且兩台手機連在同一個", "复制回应码": "複製回應碼", "更改后这台设备会重新载入": "更改後這台設備會重新載入", "分钟后": "分鐘後", "各组合并计算": "各組合併計算", "台灣啤酒": "台灣啤酒", "乌龙面": "烏龍麵", "特制备注": "特製備註", "這台加入主機": "這台加入主機", "台设备": "台設備", "每台手機自己記住": "每台手機自己記住", "這台設備的角色": "這台設備的角色", "更改後這台設備會重新載入": "更改後這台設備會重新載入", "豆干": "豆乾", "订单上的付款字段": "訂單上的付款欄位", "牛肉面店模板": "牛肉麵店模板", "红烧牛肉面": "紅燒牛肉麵", "这台手机的": "這台手機的", "已复制": "已複製", "海鲜炒面": "海鮮炒麵", "张制作中": "張製作中", "面茶红茶拿铁": "麵茶紅茶拿鐵", "第一次在这台手机打开时需要输入一次": "第一次在這台手機打開時需要輸入一次", "饭团": "飯糰", "包含还在制作中的": "包含還在製作中的", "复制邀请码": "複製邀請碼", "资料只存在这台主机的浏览器里": "資料只存在這台主機的瀏覽器裡", "干面": "乾麵"};
 
+  /* ---------- 预计等候时间 ---------- */
+  function etaBase() { return Number(shop.eta) >= 0.5 ? Number(shop.eta) : ETA_DEF; }
+  function etaPer() { return shop.etaAutoOn !== false && Number(shop.etaAuto) >= 0.5 ? Number(shop.etaAuto) : etaBase(); }
+  /* 正在做的单：电话预约且还很久才取的不算；插单排前面 */
+  function cookingList() {
+    var now = Date.now();
+    return todayOrders.filter(function (o) { return o.status === "pending" && !(o.pickupAt && o.pickupAt - now > 10 * 60000); })
+      .sort(function (a, b) { return (b.rush ? 1 : 0) - (a.rush ? 1 : 0) || a.createdAt - b.createdAt; });
+  }
+  function etaWaitNew() {
+    var n = cookingList().length;
+    return { n: n, min: Math.max(1, Math.round((n + 1) * etaPer())) };
+  }
+  function etaForOrder(o) {
+    var l = cookingList(), ix = -1;
+    l.forEach(function (x, i) { if (x.id === o.id) ix = i; });
+    if (ix < 0) return 0;
+    return Math.max(1, Math.round((ix + 1) * etaPer()));
+  }
+  /* 从今天做好的单算实际平均：每张单从「开始做」（下单或上一张做好，取较晚）到做好 */
+  function learnEtaNow() {
+    var d = todayOrders.filter(function (o) { return o.status === "done" && o.doneAt && o.createdAt && !o.autoClosed && !o.pickupAt; })
+      .sort(function (a, b) { return a.doneAt - b.doneAt; });
+    var prev = 0, xs = [];
+    d.forEach(function (o) {
+      var dt = (o.doneAt - Math.max(o.createdAt, prev)) / 60000;
+      prev = o.doneAt;
+      if (dt >= 0 && dt < 20) xs.push(dt);
+    });
+    xs = xs.slice(-30);
+    var sum = 0; xs.forEach(function (v) { sum += v; });
+    return { n: xs.length, mean: xs.length ? sum / xs.length : 0 };
+  }
+  var etaSaveAt = 0;
+  function maybeLearnEta() {
+    if (!db || isCust() || currentView === "board" || shop.etaAutoOn === false || writeNotice()) return;
+    if (Date.now() - etaSaveAt < 60000) return;
+    var L = learnEtaNow();
+    if (L.n < 5) return;
+    var today = dayKey();
+    var prior = shop.etaAutoDay === today && shop.etaPrior ? shop.etaPrior : (shop.etaAuto || etaBase());
+    var w = Math.min(1, L.n / 20);
+    var v = Math.round(Math.max(0.5, Math.min(30, w * L.mean + (1 - w) * prior)) * 10) / 10;
+    var newDay = shop.etaAutoDay !== today;
+    if (!newDay && Math.abs(v - (shop.etaAuto || 0)) < 0.1) return;
+    etaSaveAt = Date.now();
+    saveShopPatch({ etaAuto: v, etaPrior: prior, etaAutoDay: today }).catch(function () {});
+  }
+  function renderEtaNote() {
+    var n = $("#shop-etanow"); if (!n) return;
+    var L = learnEtaNow();
+    n.textContent = "目前系统用来估算的是：每张单约 " + (Math.round(etaPer() * 10) / 10) + " 分钟" +
+      (shop.etaAutoOn !== false && shop.etaAuto ? "（已根据实际出餐时间校正；今天已有 " + L.n + " 张做好的单可参考）" : "（还没有足够的实际资料，先用上面设定的值）") + "。";
+  }
+  function etaText(w) {
+    return w.n ? "目前前面有 <b>" + w.n + "</b> 张单，现在点预计约 <b>" + w.min + "</b> 分钟" : "现在没有人排队，预计约 <b>" + w.min + "</b> 分钟";
+  }
+  function renderEta() {
+    var w = etaWaitNew();
+    var a = $("#cust-eta"); if (a) { a.innerHTML = etaText(w); a.hidden = !acceptOpen(); }
+    var b = $("#order-eta"); if (b) b.innerHTML = etaText(w);
+    var c = $("#board-eta"); if (c) c.innerHTML = w.n ? "制作中 <b>" + w.n + "</b> 张 · 现在点餐预计约 <b>" + w.min + "</b> 分钟" : "现在不用等 · 预计约 <b>" + w.min + "</b> 分钟";
+    var q = $("#qr-eta"); if (q) q.innerHTML = etaText(w);
+    renderEtaNote();
+  }
+
   /* ---------- 客人扫码点餐、出餐看板、桌位 QR 码 ---------- */
   var custTable;
   var myIds = [];
@@ -4564,7 +4693,8 @@ var TW_CHARS = "与丑专业丝两个为丽么乌乐习于产仅从们价会传�
     box.hidden = !mine.length;
     box.innerHTML = mine.map(function (o) {
       var st = orderState(o);
-      return '<div class="cm-row"><span class="cm-no">#' + esc(dno(o)) + '</span><span class="cm-st ' + st[1] + '">' + st[0] + "</span></div>";
+      var em = o.status === "pending" ? etaForOrder(o) : 0;
+      return '<div class="cm-row"><span class="cm-no">#' + esc(dno(o)) + '</span><span class="cm-st ' + st[1] + '">' + st[0] + (em ? " · 预计约 " + em + " 分钟" : "") + "</span></div>";
     }).join("");
   }
   var boardSeen = null, bSoundOn = false;
@@ -4614,7 +4744,7 @@ var TW_CHARS = "与丑专业丝两个为丽么乌乐习于产仅从们价会传�
     return u;
   }
   function custUrl(base, kind) {
-    return base + (kind ? "#cust/" + kind : "#queue") + (storeId ? "/s-" + storeId : "");
+    return base + (kind ? "#cust/" + kind : "#queue") + "/s-" + (storeId || "-");
   }
   function renderTablesForm() {
     var u = $("#tb-url"); if (!u) return;
@@ -4626,8 +4756,32 @@ var TW_CHARS = "与丑专业丝两个为丽么乌乐习于产仅从们价会传�
       m.textContent = "提醒：目前的网址客人手机可能打不开（它只有你自己能看）。请改成客人能打开的网址，例如店内主机的网址，或你放在 GitHub Pages 的网址。"; m.className = "note"; m.hidden = false;
     }
     updateAcceptUi();
-    var bu = $("#tb-board"); if (bu) bu.value = u.value.replace(/#.*$/, "") + "#board" + (storeId ? "/s-" + storeId : "");
+    var bu = $("#tb-board"); if (bu) bu.value = u.value.replace(/#.*$/, "") + "#board/s-" + (storeId || "-");
     if (/^https?:\/\/\S+$/i.test(u.value)) $("#tb-queue").innerHTML = tableCards(u.value.trim().replace(/#.*$/, ""), [0]);
+  }
+  function renderQr() {
+    if (currentView !== "qr") return;
+    var sel = $("#qr-which"); if (!sel) return;
+    var tn = Math.max(1, Math.min(50, Number(($("#tb-n") || {}).value) || 10));
+    if (sel.options.length !== tn + 1) {
+      var keep = sel.value;
+      sel.innerHTML = '<option value="0">排队点餐（站在外面排队的客人）</option>';
+      for (var i = 1; i <= tn; i++) { var o = document.createElement("option"); o.value = String(i); o.textContent = "桌号 " + i; sel.appendChild(o); }
+      if (keep) sel.value = keep;
+    }
+    var base = "";
+    try { base = localStorage.getItem("xlb-custurl") || ""; } catch (e) {}
+    base = (base || defaultCustBase()).replace(/#.*$/, "");
+    var bad = !/^https?:\/\/\S+$/i.test(base) || /^(file|blob|data|capacitor|about):/i.test(base) || /claude\.(ai|com)|claudeusercontent/i.test(base);
+    var w = $("#qr-warn");
+    w.hidden = !bad;
+    if (bad) w.textContent = "目前的网址客人手机可能打不开。请到「管理 → 客人扫码点餐」把「客人打开的网址」改成客人能打开的网址（例如你的 GitHub Pages 网址）。";
+    var kind = Number(sel.value) || 0;
+    var url = custUrl(base, kind);
+    $("#qr-big").innerHTML = bad ? "" : '<div class="tb-card"><b>' + (kind ? "桌号 " + kind : "排队点餐") + "</b>" + qrSvg(url) + "<small>" + esc(url) + "</small></div>";
+    var open = acceptOpen();
+    $("#qr-state").innerHTML = "目前状态：<b>" + (open ? "开放中，客人可以扫码点单" : shop.qopen ? "已开启，但不在自动开放时间内" : "已停止，客人扫码后只会看到「尚未开放」") + "</b>";
+    $("#qr-toggle").textContent = shop.qopen ? "停止接受扫码点单" : "开始接受扫码点单";
   }
   function tableCards(base, list) {
     return list.map(function (t) {
@@ -4654,7 +4808,7 @@ var TW_CHARS = "与丑专业丝两个为丽么乌乐习于产仅从们价会传�
     var base = tbBase(); if (!base) return;
     saveQueueCfg();
     $("#tb-queue").innerHTML = tableCards(base, [0]);
-    var bu = $("#tb-board"); if (bu) bu.value = base + "#board" + (storeId ? "/s-" + storeId : "");
+    var bu = $("#tb-board"); if (bu) bu.value = base + "#board/s-" + (storeId || "-");
   }
   function makeTables() {
     var base = tbBase(); if (!base) return;
