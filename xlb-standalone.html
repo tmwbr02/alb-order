@@ -515,6 +515,52 @@ body { background-image: var(--sky, none); background-attachment: fixed; }
 .bcol.prep .bc .bp { font-size: clamp(16px, 2.2vw, 28px); }
 .bmore { font-size: clamp(18px, 2.4vw, 30px); opacity: .85; font-weight: 700; padding: 6px 4px; }
 @media (max-width: 640px) { .bcols { grid-template-columns: 1fr; } }
+
+/* ===== 出餐画面：紧凑版（参考出餐看板，一眼看到更多张单） ===== */
+#v-order .brand, #v-kitchen .brand { font-size: 26px; }
+#v-order .back, #v-kitchen .back { min-height: 36px; font-size: 16px; }
+#v-kitchen { gap: 12px; }
+#v-kitchen .pending { min-width: 64px; padding: 4px 12px; }
+#v-kitchen .pending-n { font-size: 30px; }
+#v-kitchen .tools { gap: 8px; }
+#v-kitchen .tools .ghost { min-height: 44px; padding: 0 14px; font-size: 16px; }
+#v-kitchen .tools:not(.open) > .sizes, #v-kitchen .tools:not(.open) > #accept-btn, #v-kitchen .tools:not(.open) > .langbox { display: none; }
+#v-kitchen .tools.open .kmore-btn { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+#v-kitchen .sum { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; padding: 8px 14px; border-radius: 12px; }
+#v-kitchen .sum-label { font-size: 15px; }
+#v-kitchen .sum-list { gap: 4px 16px; }
+#v-kitchen .sum-list li { font-size: 17px; }
+#v-kitchen .sum-list b { font-size: 22px; }
+#v-kitchen .orders { grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 10px; }
+#v-kitchen .order { padding: 0; gap: 0; border-radius: 14px; overflow: hidden; border-width: 2px; }
+#v-kitchen .order-head { align-items: center; gap: 8px; padding: 6px 10px; background: var(--accent); color: var(--on-accent); }
+#v-kitchen .order .no { font-size: 34px; line-height: 1; }
+#v-kitchen .order .clock { color: inherit; opacity: .8; font-size: 13px; }
+#v-kitchen .order-head .wait, #v-kitchen .order-head .pickup { font-size: 14px; padding: 3px 10px; background: var(--surface); color: var(--accent); }
+#v-kitchen .order.late { border-color: var(--warn); }
+#v-kitchen .order.late .order-head { background: var(--warn); color: var(--surface); }
+#v-kitchen .order.late .order-head .wait { color: var(--warn); }
+#v-kitchen .order.phone .order-head { background: var(--warn-soft); color: var(--warn); }
+#v-kitchen .order.rush .order-head { background: var(--chili); color: var(--on-chili); }
+#v-kitchen .rushbadge { font-size: 14px; padding: 2px 8px; background: var(--surface); color: var(--chili); }
+#v-kitchen .items { gap: 6px; padding: 10px 12px 6px; }
+#v-kitchen .items li { flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; padding-top: 6px; border-top: 1px dashed var(--line); }
+#v-kitchen .items li:first-child { padding-top: 0; border-top: 0; }
+#v-kitchen .items .name { font-size: 21px; }
+#v-kitchen .items .q { font-size: 21px; }
+#v-kitchen .items .pills { gap: 4px; }
+#v-kitchen .items .pill { font-size: 14px; padding: 1px 8px; border-width: 1px; border-radius: 6px; }
+#v-kitchen .tagrow { padding: 4px 12px 8px; border-top: 0; gap: 4px; }
+#v-kitchen .tagrow .pill { font-size: 13px; padding: 1px 8px; border-width: 1px; border-radius: 6px; }
+#v-kitchen .kfoot { margin-top: auto; padding: 8px 10px 10px; display: grid; grid-template-columns: auto 1fr; gap: 6px 8px; align-items: center; border-top: 2px solid var(--line); }
+#v-kitchen .kfoot .subacts { grid-column: 1 / -1; }
+#v-kitchen .due { padding: 0 2px; background: none; font-size: 12px; flex-direction: column; align-items: flex-start; gap: 0; }
+#v-kitchen .due b { font-size: 20px; }
+#v-kitchen .done { min-height: 50px; font-size: 20px; line-height: 1.1; border-radius: 12px; }
+#v-kitchen .done small { display: block; font-size: 11px; font-weight: 500; opacity: .85; }
+#v-kitchen .subacts { gap: 6px; }
+#v-kitchen .subacts .btn-sm { min-height: 38px; font-size: 13px; padding: 0 6px; }
+@media (min-width: 700px) { #v-kitchen .orders { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); } }
 </style>
 <div class="lan-banner" id="lan-banner" hidden></div>
 <!-- 首页 -->
@@ -660,6 +706,7 @@ body { background-image: var(--sky, none); background-attachment: fixed; }
     <span class="sizes" role="radiogroup" aria-label="画面大小"><span class="sz-l">画面大小</span><button type="button" class="chip sz" role="radio" aria-checked="false" data-act="size" data-value="xs">特小</button><button type="button" class="chip sz" role="radio" aria-checked="false" data-act="size" data-value="s">小</button><button type="button" class="chip sz" role="radio" aria-checked="false" data-act="size" data-value="m">中</button><button type="button" class="chip sz" role="radio" aria-checked="false" data-act="size" data-value="l">大</button><button type="button" class="chip sz" role="radio" aria-checked="true" data-act="size" data-value="xl">特大</button></span>
     <button type="button" class="ghost" id="sound" data-act="sound">新单提示音：关</button>
     <button type="button" class="ghost" id="stat-open" data-act="stat-open">品项状态<span id="stbox-k-n"></span></button>
+    <button type="button" class="ghost kmore-btn" data-act="kmore" aria-expanded="false">⚙ 更多设定</button>
     <button type="button" class="ghost" id="accept-btn" data-act="accept-toggle">扫码点单：已停止</button>
   </div>
   <p class="banner" id="banner-kitchen" hidden></p>
@@ -2272,24 +2319,26 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (o.table) tags.push('<span class="pill dine">' + esc(tableLabel(o.table)) + "</span>");
     if (o.src === "customer") tags.push('<span class="pill phone">客人扫码点餐</span>');
     if (o.src === "queue") tags.push('<span class="pill phone">客人排队点餐</span>');
-    if (o.dine) tags.push('<span class="pill' + (o.dine === "内用" ? " dine" : o.dine === "电话预约" ? " phone" : "") + '">' + esc(o.dine) + "</span>");
-    if (o.cutlery) tags.push('<span class="pill' + (o.cutlery && o.cutlery !== "要餐具" ? " ice" : "") + '">' + esc(o.cutlery) + "</span>");
-    if (o.bag) tags.push('<span class="pill' + (o.bag === "不要塑胶袋" ? " ice" : "") + '">' + esc(o.bag) + "</span>");
+    if (o.dine && o.dine !== "外带") tags.push('<span class="pill' + (o.dine === "内用" ? " dine" : o.dine === "电话预约" ? " phone" : "") + '">' + esc(o.dine) + "</span>");
+    /* 出餐卡片只标示「例外」：要餐具、要塑胶袋是预设，不再占位置 */
+    if (o.cutlery && o.cutlery !== "要餐具") tags.push('<span class="pill ice">' + esc(o.cutlery) + "</span>");
+    if (o.bag && o.bag !== "要塑胶袋") tags.push('<span class="pill ice">' + esc(o.bag) + "</span>");
     if (o.dine === "电话预约" && o.phoneTail) tags.splice(1, 0, '<span class="pill phone">电话末码 ' + esc(o.phoneTail) + "</span>");
     if (o.editedAt) tags.push('<span class="pill edited">订单已修改</span>');
     var isPhone = o.dine === "电话预约" && o.pickupAt;
     var waitHTML = isPhone
       ? '<span class="pickup' + pickupCls(o.pickupAt) + '" data-pat="' + o.pickupAt + '">' + esc(pickupText(o.pickupAt)) + "</span>"
       : '<span class="wait' + (waitMin(o.createdAt) >= 5 ? " late" : "") + '" data-at="' + o.createdAt + '">' + waitText(o.createdAt) + "</span>";
-    return '<article class="order' + (isPhone ? " phone" : "") + (o.rush ? " rush" : "") + '" data-no="' + esc(o.no) + '">' +
+    var lateCls = !isPhone && waitMin(o.createdAt) >= 5 ? " late" : "";
+    return '<article class="order' + (isPhone ? " phone" : "") + (o.rush ? " rush" : "") + lateCls + '" data-no="' + esc(o.no) + '">' +
       '<div class="order-head"><span class="no">#' + esc(dno(o)) + '</span>' + (o.rush ? '<span class="rushbadge">插单</span>' : "") + '<span class="clock">' + clock(o.createdAt) + ' 下单</span>' +
       waitHTML + "</div>" +
       '<ul class="items">' + items + "</ul>" +
       (tags.length ? '<div class="pills tagrow">' + tags.join("") + "</div>" : "") +
-      '<p class="due"><span>应收</span><b>' + money(orderValue(o)) + "</b></p>" +
-      '<button type="button" class="done" data-act="done-front" data-id="' + esc(o.id) + '"' + (canWrite === false ? " disabled" : "") + ">出餐（前面收款）</button>" +
+      '<div class="kfoot"><p class="due"><span>应收</span><b>' + money(orderValue(o)) + "</b></p>" +
+      '<button type="button" class="done" data-act="done-front" data-id="' + esc(o.id) + '"' + (canWrite === false ? " disabled" : "") + ">出餐<small>前面收款</small></button>" +
       '<div class="subacts"><button type="button" class="btn-sm" data-act="done" data-id="' + esc(o.id) + '"' + (canWrite === false ? " disabled" : "") + ">我收现金</button>" +
-      '<button type="button" class="btn-sm" data-act="pay-open" data-id="' + esc(o.id) + '"' + (canWrite === false ? " disabled" : "") + ">其他支付／找零</button></div></article>";
+      '<button type="button" class="btn-sm" data-act="pay-open" data-id="' + esc(o.id) + '"' + (canWrite === false ? " disabled" : "") + ">其他支付／找零</button></div></div></article>";
   }
   function renderKitchen() {
     orders.sort(function (a, b) {
@@ -2328,6 +2377,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     Array.prototype.forEach.call(document.querySelectorAll(".wait"), function (el) {
       var at = Number(el.getAttribute("data-at"));
       el.textContent = waitText(at);
+      var card = el.closest ? el.closest(".order") : null;
+      if (card) card.classList.toggle("late", waitMin(at) >= 5);
       el.classList.toggle("late", waitMin(at) >= 5);
     });
   }
@@ -3180,10 +3231,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
   /* ---------- 画面大小（每台手机自己记住，点餐与出餐各一个） ---------- */
   var SIZE_ZOOM = { xs: 0.6, s: 0.7, m: 0.8, l: 0.9, xl: 1 };
-  var sizes = { order: "xl", kitchen: "xl" };
+  var sizes = { order: "m", kitchen: "m" };
   try {
     ["order", "kitchen"].forEach(function (k) {
-      var v = localStorage.getItem("xlb-size5-" + k);
+      var v = localStorage.getItem("xlb-size6-" + k);
       if (SIZE_ZOOM[v]) sizes[k] = v;
     });
   } catch (e) {}
@@ -3444,11 +3495,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     } else if (act === "size") {
       var sk = currentView === "kitchen" ? "kitchen" : "order";
       sizes[sk] = t.getAttribute("data-value");
-      try { localStorage.setItem("xlb-size5-" + sk, sizes[sk]); } catch (e) {}
+      try { localStorage.setItem("xlb-size6-" + sk, sizes[sk]); } catch (e) {}
       applySizes();
     } else if (act === "to-staff") {
       /* 扫过客人 QR 码的设备：网址里带着客人标记，会一直停在客人画面。拿掉网址后面的标记重新打开，就会出现「店家登入」。 */
       location.replace(location.pathname + location.search);
+    } else if (act === "kmore") {
+      var kt = t.closest(".tools"); var op = kt.classList.toggle("open");
+      t.setAttribute("aria-expanded", op ? "true" : "false");
     } else if (act === "stat-open") {
       $("#statsheet").hidden = false; renderSoldPanel();
     } else if (act === "stat-close") {
