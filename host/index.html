@@ -656,6 +656,7 @@ body { background-image: var(--sky, none); background-attachment: fixed; }
     <span class="conn" id="conn-kitchen" data-state="wait"><span class="dot"></span><span id="conn-kitchen-text">连线中…</span></span>
     <span class="sizes" role="radiogroup" aria-label="画面大小"><span class="sz-l">画面大小</span><button type="button" class="chip sz" role="radio" aria-checked="false" data-act="size" data-value="xs">特小</button><button type="button" class="chip sz" role="radio" aria-checked="false" data-act="size" data-value="s">小</button><button type="button" class="chip sz" role="radio" aria-checked="false" data-act="size" data-value="m">中</button><button type="button" class="chip sz" role="radio" aria-checked="false" data-act="size" data-value="l">大</button><button type="button" class="chip sz" role="radio" aria-checked="true" data-act="size" data-value="xl">特大</button></span>
     <button type="button" class="ghost" id="sound" data-act="sound">新单提示音：关</button>
+    <button type="button" class="ghost" id="stat-open" data-act="stat-open">品项状态<span id="stbox-k-n"></span></button>
     <button type="button" class="ghost" id="accept-btn" data-act="accept-toggle">扫码点单：已停止</button>
   </div>
   <p class="banner" id="banner-kitchen" hidden></p>
@@ -663,8 +664,20 @@ body { background-image: var(--sky, none); background-attachment: fixed; }
     <span class="sum-label">待做合计</span>
     <ul class="sum-list" id="sum-list"></ul>
   </div>
-  <details class="stbox" id="stbox-k"><summary>品项状态设定：售完、要等多久、剩余数量<span id="stbox-k-n"></span></summary><div class="stlist" id="sold-chips"></div></details>
   <div class="orders" id="orders"></div>
+</div>
+
+<!-- 出餐：品项状态（按「品项状态」按钮才打开） -->
+<div class="sheet" id="statsheet" hidden>
+  <div class="scrim" data-act="stat-close"></div>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="stat-title">
+    <div class="panel-head">
+      <h2 id="stat-title">品项状态</h2>
+      <button type="button" class="close" data-act="stat-close">关闭</button>
+    </div>
+    <p class="note">售完、要等多久、剩余数量（隔天自动恢复）</p>
+    <div class="stlist" id="sold-chips"></div>
+  </div>
 </div>
 
 <!-- 管理者 -->
@@ -3201,6 +3214,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     $("#v-cust").hidden = currentView !== "cust";
     $("#v-qr").hidden = currentView !== "qr";
     $("#v-board").hidden = currentView !== "board";
+    $("#statsheet").hidden = true;
     if (currentView === "cust") { loadMyIds(); renderCustHead(); renderCustMine(); }
     if (currentView === "board") { boardSeen = null; renderBoard(); }
     try { keepOnRoute(currentView); } catch (eK) {}
@@ -3429,6 +3443,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       sizes[sk] = t.getAttribute("data-value");
       try { localStorage.setItem("xlb-size5-" + sk, sizes[sk]); } catch (e) {}
       applySizes();
+    } else if (act === "stat-open") {
+      $("#statsheet").hidden = false; renderSoldPanel();
+    } else if (act === "stat-close") {
+      $("#statsheet").hidden = true;
     } else if (act === "sound") {
       toggleSound();
     }
