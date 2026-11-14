@@ -663,10 +663,7 @@ body { background-image: var(--sky, none); background-attachment: fixed; }
     <span class="sum-label">待做合计</span>
     <ul class="sum-list" id="sum-list"></ul>
   </div>
-  <div class="sum">
-    <span class="sum-label">品项状态：售完、要等多久、剩余数量（隔天自动恢复）</span>
-    <div class="stlist" id="sold-chips"></div>
-  </div>
+  <details class="stbox" id="stbox-k"><summary>品项状态设定：售完、要等多久、剩余数量<span id="stbox-k-n"></span></summary><div class="stlist" id="sold-chips"></div></details>
   <div class="orders" id="orders"></div>
 </div>
 
@@ -1827,6 +1824,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (a && box.contains(a) && (a.classList.contains("st-stock") || a.classList.contains("st-wait"))) return;
       box.innerHTML = MENU.map(function (it) { return statRowHTML(it, p[1], dis); }).join("");
     });
+    var kn = $("#stbox-k-n");
+    if (kn) { var nOut = MENU.filter(function (it) { return isSold(it.id); }).length; kn.textContent = nOut ? "（" + nOut + " 项已售完）" : ""; }
   }
   async function saveStat(id, patch, msg) {
     if (!db || writeNotice() || !byId[id]) return;
@@ -5363,7 +5362,7 @@ var TW_CHARS = "与丑专业丝两个为丽么乌乐习于产仅从们价会传�
     /* 出餐画面：进来就自动开启常驻模式，除非店员在出餐画面自己关掉过 */
     if (v === "kitchen" && !KEEP.on && keepGet("xlb-kitchen-off") !== "1") {
       keepSetOn(true, true);
-      showToast(K("已为出餐画面开启常驻模式（屏幕一直亮）。不需要的话，按右上角的按钮改回正常使用", "Always-on mode is ON for the kitchen screen. Tap the button at the top to switch it off."), false, true, 4500);
+      showToast(K("已为出餐画面开启常驻模式（屏幕一直亮）。不需要的话，按「已连线」旁边的按钮改回正常使用", "Always-on mode is ON for the kitchen screen. Tap the button next to the connection status to switch it off."), false, true, 4500);
       return;
     }
     if (v === "board" && keepGet("xlb-keep") === null && !KEEP.on) {
@@ -5377,6 +5376,8 @@ var TW_CHARS = "与丑专业丝两个为丽么乌乐习于产仅从们价会传�
     if (home) home.insertAdjacentHTML("afterend", '<div class="keeprow" data-notr>' + btn + '<span class="help" id="keep-hint" data-notr></span></div>');
     ["#v-order .tools", "#v-kitchen .tools"].forEach(function (sel) {
       var h = document.querySelector(sel); if (!h) return;
+      var cn = sel.indexOf("kitchen") > 0 ? h.querySelector(".conn") : null;   /* 出餐：常驻按钮紧跟在「已连线」旁边 */
+      if (cn) { cn.insertAdjacentHTML("afterend", btn); return; }
       var lb = h.querySelector(".langbox");
       if (lb) lb.insertAdjacentHTML("beforebegin", btn); else h.insertAdjacentHTML("beforeend", btn);
     });
