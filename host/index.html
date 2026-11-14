@@ -452,6 +452,8 @@ html:not([lang^="zh"]):not([lang="ja"]) .tile strong, html:not([lang^="zh"]):not
 .st-wait { width: auto; min-width: 128px; }
 .st-stock { width: 92px; }
 .st-left { font-size: 17px; font-weight: 700; color: var(--chili); }
+.tostaff { margin: 40px 0 120px; text-align: center; }
+.tostaff-btn { border: 0; background: none; color: var(--muted); font-size: 15px; text-decoration: underline; padding: 10px; }
 .stbox { padding: 12px 16px; border-radius: 16px; background: var(--surface); border: 2px solid var(--line); }
 .stbox summary { font-size: 18px; font-weight: 700; color: var(--muted); cursor: pointer; min-height: 40px; display: flex; align-items: center; }
 .qr-big .tb-card { max-width: 360px; margin: 0 auto; }
@@ -578,6 +580,7 @@ body { background-image: var(--sky, none); background-attachment: fixed; }
     <div class="tiles" id="cust-drink"></div>
   </section>
   </div>
+  <p class="tostaff"><button type="button" class="tostaff-btn" data-act="to-staff">店员：把这台改成店内设备</button></p>
 </div>
 
 <!-- 出餐进度看板 -->
@@ -3443,6 +3446,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       sizes[sk] = t.getAttribute("data-value");
       try { localStorage.setItem("xlb-size5-" + sk, sizes[sk]); } catch (e) {}
       applySizes();
+    } else if (act === "to-staff") {
+      /* 扫过客人 QR 码的设备：网址里带着客人标记，会一直停在客人画面。拿掉网址后面的标记重新打开，就会出现「店家登入」。 */
+      location.replace(location.pathname + location.search);
     } else if (act === "stat-open") {
       $("#statsheet").hidden = false; renderSoldPanel();
     } else if (act === "stat-close") {
