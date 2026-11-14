@@ -208,6 +208,18 @@ h2::after { content: ""; flex: 1; height: 2px; background: var(--line); }
 .st.done { background: var(--bg); color: var(--muted); border: 2px solid var(--line); }
 .st.cancel { background: var(--warn-soft); color: var(--warn); }
 .ord-lines { list-style: none; margin: 0; padding: 0; font-size: 19px; }
+.ord-sec { margin: 6px 0 4px; font-size: 20px; font-weight: 700; color: var(--accent); }
+.ord-sec.past { margin-top: 22px; font-size: 16px; color: var(--muted); }
+.ord-live .ord { margin: 10px 0; padding: 16px; border: 3px solid var(--accent); border-radius: 18px; background: var(--accent-soft); }
+.ord-live .ord:first-child { border-top: 3px solid var(--accent); }
+.ord-live .ord-no { font-size: 42px; }
+.ord-live .ord-lines { font-size: 22px; font-weight: 700; }
+.ord-live .ord-foot { color: var(--ink); }
+.ord-past .ord { padding: 8px 0; gap: 4px; opacity: .65; }
+.ord-past .ord-no { font-size: 22px; }
+.ord-past .ord-lines { font-size: 15px; }
+.ord-past .ord-foot { font-size: 14px; }
+.ord-past .st { font-size: 14px; padding: 2px 8px; }
 .ord.cancelled .ord-lines { text-decoration: line-through; color: var(--muted); }
 .ord-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 17px; color: var(--muted); }
 .ord-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
@@ -731,7 +743,7 @@ body { background-image: var(--sky, none); background-attachment: fixed; }
         <p class="note" id="shop-etanow"></p>
         <div class="fld"><span>店家风格（点一下可预览，按「储存店家设置」才会套用到所有设备）</span><div class="skins" id="shop-skins"></div></div>
         <p class="err" id="shop-msg" hidden></p>
-        <button type="button" class="send" data-act="shop-save">储存店家设置</button>
+        <button type="button" class="send" id="shop-save" data-act="shop-save">储存店家设置</button>
         <p class="note">更换币别不会改动已有订单和统计的数字（它们仍是当时记下的数字）。汇率只是参考，换算后请自行检查菜单价格。</p>
       </div>
       <div class="card stack" id="store-code-box" hidden>
@@ -1360,16 +1372,19 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     var etaChanged = Math.abs(etaV - (shop.eta || ETA_DEF)) > 0.001;
     if (pay.length > 8) { say("付款方式最多 8 个（现金固定在第一个）。", true); return; }
     if (pay.some(function (m) { return m.length > 14; })) { say("每个付款方式名称请在 14 个字以内。", true); return; }
+    saveBtn("#shop-save", "busy");
     try {
       if (cur !== baseCode && $("#shop-conv").checked) {
         var from = baseCode;
         var conv = ITEMS.map(function (it) { return convItem(it, from, cur); });
-        await db.doc("config/menu").set({ items: conv, updatedAt: Date.now() });
+        await saveRace(db.doc("config/menu").set({ items: conv, updatedAt: Date.now() }));
       }
-      await db.doc("config/shop").set(shopDocData(Object.assign({ name: name, cur: cur, pay: pay, skin: shopSkinSel, eta: etaV, etaAutoOn: etaOn }, etaChanged ? { etaAuto: 0, etaPrior: 0, etaAutoDay: "" } : {})));
+      var stS = await saveRace(db.doc("config/shop").set(shopDocData(Object.assign({ name: name, cur: cur, pay: pay, skin: shopSkinSel, eta: etaV, etaAutoOn: etaOn }, etaChanged ? { etaAuto: 0, etaPrior: 0, etaAutoDay: "" } : {}))));
       shopDirty = false;
-      say("已储存。" + (cur !== shop.cur ? "（币别已更换；已有订单和统计的数字不会换算。）" : ""), false);
+      var slowS = saveDone("#shop-save", stS, "店家设置已储存");
+      say((slowS ? "已储存在这台设备，网络恢复后会自动同步。" : "已储存。") + (cur !== shop.cur ? "（币别已更换；已有订单和统计的数字不会换算。）" : ""), false);
     } catch (e) {
+      saveFail("#shop-save");
       say("储存失败，请再试一次。", true);
     }
   }
@@ -1900,7 +1915,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return b.createdAt - a.createdAt;
     }).slice(0, 40);
     if (!list.length) return '<p class="empty-s">今天还没有订单。</p>';
-    return '<ul class="lines">' + list.map(ordHTML).join("") + "</ul>";
+    var live = list.filter(function (o) { return o.status === "pending"; });
+    var past = list.filter(function (o) { return o.status !== "pending"; });
+    return (live.length
+        ? '<p class="ord-sec">制作中（' + live.length + '）</p><ul class="lines ord-live">' + live.map(ordHTML).join("") + "</ul>"
+        : '<p class="empty-s">目前没有制作中的订单。</p>') +
+      (past.length ? '<p class="ord-sec past">已完成／已取消（' + past.length + '）</p><ul class="lines ord-past">' + past.map(ordHTML).join("") + "</ul>" : "");
   }
   function updateOrdersCount() {
     var n = todayOrders.filter(function (o) { return o.status === "pending"; }).length;
@@ -2858,6 +2878,37 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     edDelAsk = -1;
     if (adminUnlocked && adminTab === "menu") renderEditor();
   }
+  /* 储存反馈：按钮显示「储存中…／已储存 ✓」，并在画面下方跳出提示；网络太慢时不再一直卡住。 */
+  function saveRace(p, ms) {
+    return Promise.race([
+      p.then(function () { return "ok"; }),
+      new Promise(function (r) { setTimeout(function () { r("slow"); }, ms || 5000); })
+    ]);
+  }
+  function saveBtn(sel, state) {
+    var b = $(sel);
+    if (!b) return;
+    if (!b.getAttribute("data-orig")) b.setAttribute("data-orig", b.textContent);
+    clearTimeout(b._t);
+    if (state === "busy") { b.disabled = true; b.textContent = "储存中…"; return; }
+    b.disabled = false;
+    if (state === "ok") {
+      b.textContent = "已储存 ✓";
+      b._t = setTimeout(function () { b.textContent = b.getAttribute("data-orig"); }, 2500);
+    } else {
+      b.textContent = b.getAttribute("data-orig");
+    }
+  }
+  function saveDone(sel, st, okMsg) {
+    var slow = st === "slow";
+    saveBtn(sel, "ok");
+    showToast(slow ? "已储存在这台设备，网络恢复后会自动同步。" : okMsg, false, true, 3500);
+    return slow;
+  }
+  function saveFail(sel, msg) {
+    saveBtn(sel, "fail");
+    showToast(msg || "储存失败，请再试一次。", false, true, 4000);
+  }
   function setMenuMsg(msg, bad) {
     var el = $("#menu-msg");
     el.textContent = msg || "";
@@ -2960,18 +3011,19 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (!db || notice) { setMenuMsg(notice || "没有连上订单资料。", true); return; }
     var res = collectItems();
     if (typeof res === "string") { setMenuMsg(res, true); return; }
-    $("#ed-save").disabled = true;
+    saveBtn("#ed-save", "busy");
     try {
-      await db.doc("config/menu").set({ items: res, updatedAt: Date.now() });
+      var stM = await saveRace(db.doc("config/menu").set({ items: res, updatedAt: Date.now() }));
       edDirty = false;
       applyMenu(res);
       loadEditorFromMenu();
       renderEditor();
-      setMenuMsg("已储存。点餐端的菜单会马上更新。", false);
+      var slowM = saveDone("#ed-save", stM, "菜单已储存，点餐端马上更新");
+      setMenuMsg(slowM ? "已储存在这台设备，网络恢复后会自动同步。" : "已储存。点餐端的菜单会马上更新。", false);
     } catch (e) {
+      saveFail("#ed-save", "储存失败，请检查网络后再按一次。");
       setMenuMsg("储存失败，请检查网络后再按一次。", true);
     }
-    $("#ed-save").disabled = false;
   }
 
   /* ---------- 管理者：密码 ---------- */
@@ -2994,13 +3046,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (!/^\d{4,12}$/.test(a)) { say("新密码要是 4 到 12 个数字。", true); return; }
     if (a !== b) { say("两次输入的新密码不一样。", true); return; }
     if (!db || writeNotice()) { say("没有连上资料库，无法储存。", true); return; }
+    saveBtn("#rpw-save", "busy");
     try {
-      await db.doc("config/resetpw").set({ pw: a, updatedAt: Date.now() });
+      var stR = await saveRace(db.doc("config/resetpw").set({ pw: a, updatedAt: Date.now() }));
       resetPw = a;
+      saveDone("#rpw-save", stR, "重置密码已储存");
       $("#rpw-new").value = ""; $("#rpw-new2").value = "";
       say(a === adminPw ? "已储存。提醒：重置密码和登录密码一样，建议改成不一样的。" : "已储存重置密码。", false);
       renderPass();
     } catch (e) {
+      saveFail("#rpw-save");
       say("储存失败，请再试一次。", true);
     }
   }
@@ -3012,14 +3067,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (!/^\d{4,12}$/.test(a)) { say("新密码要是 4 到 12 个数字。", true); return; }
     if (a !== b) { say("两次输入的新密码不一样。", true); return; }
     if (!db || writeNotice()) { say("没有连上资料库，无法储存。", true); return; }
+    saveBtn("#pw-save", "busy");
     try {
-      await db.doc("config/admin").set({ pw: a, updatedAt: Date.now() });
+      var stA = await saveRace(db.doc("config/admin").set({ pw: a, updatedAt: Date.now() }));
       adminPw = a;
       $("#pw-new").value = "";
       $("#pw-new2").value = "";
+      saveDone("#pw-save", stA, "管理者密码已更新");
       say("已更新管理者密码。", false);
       renderPass();
     } catch (e) {
+      saveFail("#pw-save");
       say("储存失败，请再试一次。", true);
     }
   }
@@ -5241,6 +5299,7 @@ var TW_CHARS = "与丑专业丝两个为丽么乌乐习于产仅从们价会传�
       KEEP.hot = false; keepSet("xlb-hot", "0");
     }
     KEEP.on = !!on; keepSet("xlb-keep", on ? "1" : "0");
+    if (!silent && currentView === "kitchen") keepSet("xlb-kitchen-off", on ? "0" : "1");
     if (on) { KEEP.how = "tap"; keepStart(!silent); } else keepStop();
     keepRender();
     if (silent) return;
@@ -5301,6 +5360,12 @@ var TW_CHARS = "与丑专业丝两个为丽么乌乐习于产仅从们价会传�
     }
   }
   function keepOnRoute(v) {
+    /* 出餐画面：进来就自动开启常驻模式，除非店员在出餐画面自己关掉过 */
+    if (v === "kitchen" && !KEEP.on && keepGet("xlb-kitchen-off") !== "1") {
+      keepSetOn(true, true);
+      showToast(K("已为出餐画面开启常驻模式（屏幕一直亮）。不需要的话，按右上角的按钮改回正常使用", "Always-on mode is ON for the kitchen screen. Tap the button at the top to switch it off."), false, true, 4500);
+      return;
+    }
     if (v === "board" && keepGet("xlb-keep") === null && !KEEP.on) {
       keepSetOn(true, true);
       showToast(K("已为出餐看板开启常驻模式，可在右上角改回正常使用", "Always-on mode is ON for this board. Switch it off at the top right."), false, true, 4000);
@@ -5355,6 +5420,8 @@ var TW_CHARS = "与丑专业丝两个为丽么乌乐习于产仅从们价会传�
     if (KEEP.on) KEEP.how = "tap";
     keepRender();
     if (KEEP.on) keepStart(false);
+    /* 直接打开出餐／看板网址时，route() 比这里先跑，所以这里再补一次自动开启 */
+    try { keepOnRoute(currentView); } catch (eK) {}
   }
 
   /* ---------- 收款码（LINE Pay、街口等：店家上传一次，收款时放大显示）---------- */
