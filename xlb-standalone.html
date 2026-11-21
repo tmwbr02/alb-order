@@ -576,6 +576,15 @@ body { background-image: var(--sky, none); background-attachment: fixed; }
 #v-kitchen .done small { display: block; font-size: 11px; font-weight: 500; opacity: .85; }
 #v-kitchen .subacts { gap: 6px; }
 #v-kitchen .subacts .btn-sm { min-height: 38px; font-size: 13px; padding: 0 6px; }
+#v-kitchen .kv-on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.kv-strip { margin: 0; padding: 10px 14px; border-radius: 12px; border: 2px solid var(--accent); background: var(--accent-soft); color: var(--accent); font-size: 17px; font-weight: 600; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.kv-strip[hidden] { display: none; }
+.kv-strip .kv-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); flex: none; }
+.kv-strip.live .kv-dot { animation: kvpulse 1.2s ease-in-out infinite; }
+.kv-strip.pause .kv-dot { background: var(--line); animation: none; }
+.kv-strip.bad { border-color: var(--warn); background: var(--warn-soft); color: var(--warn); }
+.kv-strip .kv-heard { font-weight: 500; opacity: .85; font-size: 15px; }
+@keyframes kvpulse { 50% { opacity: .25; } }
 @media (min-width: 700px) { #v-kitchen .orders { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); } }
 </style>
 <div class="lan-banner" id="lan-banner" hidden></div>
@@ -722,12 +731,15 @@ body { background-image: var(--sky, none); background-attachment: fixed; }
     <span class="conn" id="conn-kitchen" data-state="wait"><span class="dot"></span><span id="conn-kitchen-text">连线中…</span></span>
     <span class="sizes" role="radiogroup" aria-label="画面大小"><span class="sz-l">画面大小</span><button type="button" class="chip sz" role="radio" aria-checked="false" data-act="size" data-value="xs">特小</button><button type="button" class="chip sz" role="radio" aria-checked="false" data-act="size" data-value="s">小</button><button type="button" class="chip sz" role="radio" aria-checked="false" data-act="size" data-value="m">中</button><button type="button" class="chip sz" role="radio" aria-checked="false" data-act="size" data-value="l">大</button><button type="button" class="chip sz" role="radio" aria-checked="true" data-act="size" data-value="xl">特大</button></span>
     <button type="button" class="ghost" id="sound" data-act="sound">新单提示音：关</button>
+    <button type="button" class="ghost" id="kv-tts" data-kv="tts" data-notr>🔊 语音播报新单：关</button>
+    <button type="button" class="ghost" id="kv-hf" data-kv="hf" data-notr>🎙 喊号出餐：关</button>
     <button type="button" class="ghost" id="stat-open" data-act="stat-open">品项状态<span id="stbox-k-n"></span></button>
     <button type="button" class="ghost" id="voice-open-k" data-act="voice-open">🎤 语音点单</button>
     <button type="button" class="ghost kmore-btn" data-act="kmore" aria-expanded="false">⚙ 更多设定</button>
     <button type="button" class="ghost" id="accept-btn" data-act="accept-toggle">扫码点单：已停止</button>
   </div>
   <p class="banner" id="banner-kitchen" hidden></p>
+  <p class="kv-strip" id="kv-strip" data-notr hidden><span class="kv-dot"></span><span id="kv-state"></span><span class="kv-heard" id="kv-heard"></span></p>
   <div class="sum" id="sum" hidden>
     <span class="sum-label">待做合计</span>
     <ul class="sum-list" id="sum-list"></ul>
@@ -2494,6 +2506,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         var no = (last && last.no) || s.data().no;
         showToast("#" + dno(last||{no:no}) + " 已被取消，不用做了", false, false, 10000);
         beep();
+        kvSay(Number(dno(last||{no:no})) + " 号已被取消，不用做了");
       }
     }).catch(function () {});
   }
@@ -2524,6 +2537,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       firstSnap = false;
       renderKitchen();
       if (isNew || edited) beep();
+      if (!wasFirst) kvOnSnap(snap.docChanges(), edited);
+      else orders.forEach(function (o) { kvSeen[o.id] = o.editedAt || 1; });
       if (edited) showToast("有订单被修改了，请看标示「订单已修改」的那张", false, false, 8000);
       if (!snap.metadata.fromCache && !cleaned) { cleaned = true; closeStale(); cleanupOld(); }
     }, function () {
@@ -6151,10 +6166,216 @@ var TW_CHARS = "与丑专业丝两个为丽么乌乐习于产仅从们价会传�
     if (currentView === "cust") { loadMyIds(); renderCustMine(); }
   }
 
+  /* ---------- 出餐区语音：新单语音播报、喊号出餐（免手） ----------
+     播报：出餐端收到新单时，把单号和内容念出来；订单被修改、取消也会念。
+     喊号出餐：出餐的人说「12 号出餐」，就等于按那张单的「出餐（前面收款）」。说「撤销」可以复原上一张。
+     系统在念的时候会先停止收音，免得把自己念的话当成指令。 */
+  var kvTts = false, kvHf = false, kvSeen = {}, kvLast = "";
+  var kvRec = null, kvRecOn = false, kvSpeaking = 0, kvRestartT = null, kvQuick = 0, kvStartAt = 0, kvUnlocked = false;
+  function kvCode() { return lang === "zh-TW" ? "zh-TW" : "zh-CN"; }
+  function kvTxt(s) { return lang === "zh-TW" ? trTW(s) : s; }
+  function kvVoice(code) {
+    try {
+      var vs = window.speechSynthesis.getVoices() || [], c = code.toLowerCase();
+      var norm = function (v) { return String(v.lang || "").replace("_", "-").toLowerCase(); };
+      return vs.filter(function (v) { return norm(v) === c; })[0] ||
+        vs.filter(function (v) { return norm(v).indexOf(c.slice(0, 5)) === 0; })[0] ||
+        vs.filter(function (v) { return norm(v).indexOf("zh") === 0 || norm(v).indexOf("cmn") === 0; })[0] || null;
+    } catch (e) { return null; }
+  }
+  function kvSay(text) {
+    if (!kvTts || !window.speechSynthesis || !window.SpeechSynthesisUtterance || !text) return;
+    try {
+      var u = new SpeechSynthesisUtterance(kvTxt(text)), code = kvCode(), v = kvVoice(code);
+      u.lang = code; if (v) u.voice = v; u.rate = 1; u.volume = 1;
+      kvSpeaking++; kvPause();
+      var done = false, fin = function () { if (done) return; done = true; kvSpeaking = Math.max(0, kvSpeaking - 1); if (!kvSpeaking) kvSchedule(400); };
+      u.onend = fin; u.onerror = fin;
+      setTimeout(fin, 4000 + String(text).length * 260);
+      window.speechSynthesis.speak(u);
+    } catch (e) { kvSpeaking = Math.max(0, kvSpeaking - 1); }
+  }
+  /* 把一张单念成一句话：「新单，12 号。小笼包 3 笼，甜辣。蒸饺 2 份。内用。」 */
+  function kvOrderText(o, head) {
+    var parts = [(o.rush ? "插单，" : "") + head + "，" + Number(dno(o)) + " 号"];
+    (o.lines || []).forEach(function (l) {
+      var opts = (l.opts || []).filter(function (v) { return v && v !== "正常"; }).map(pillText);
+      parts.push(l.name + " " + l.qty + " " + (l.unit || "") + (opts.length ? "，" + opts.join("，") : ""));
+    });
+    if (o.table) parts.push(tableLabel(o.table));
+    else if (o.dine && o.dine !== "外带") parts.push(o.dine);
+    if (o.cutlery && o.cutlery !== "要餐具") parts.push(o.cutlery);
+    if (o.bag && o.bag !== "要塑胶袋") parts.push(o.bag);
+    return parts.join("。") + "。";
+  }
+  function kvOnSnap(changes, edited) {
+    changes.forEach(function (c) {
+      var o = orders.filter(function (x) { return x.id === c.doc.id; })[0];
+      if (!o) return;
+      if (c.type === "added") {
+        if (kvSeen[o.id]) return; /* 撤销后回到待做的单，不再重念 */
+        kvSeen[o.id] = 1;
+        kvLast = kvOrderText(o, "新单");
+        kvSay(kvLast);
+      } else if (c.type === "modified" && edited && o.editedAt && kvSeen[o.id] !== o.editedAt) {
+        kvSeen[o.id] = o.editedAt;
+        kvLast = kvOrderText(o, "订单修改");
+        kvSay(kvLast);
+      }
+    });
+  }
+
+  /* ---------- 喊号出餐：听懂「12 号出餐」 ---------- */
+  var KV_D = { "零": 0, "〇": 0, "○": 0, "洞": 0, "一": 1, "幺": 1, "么": 1, "二": 2, "两": 2, "兩": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9 };
+  function kvCnNum(s) {
+    if (!/[十百]/.test(s)) return s.split("").map(function (ch) { return KV_D[ch]; }).join("");
+    var total = 0, cur = 0;
+    s.split("").forEach(function (ch) {
+      if (ch === "百") { total += (cur || 1) * 100; cur = 0; }
+      else if (ch === "十") { total += (cur || 1) * 10; cur = 0; }
+      else cur = KV_D[ch] || 0;
+    });
+    return String(total + cur);
+  }
+  function kvNorm(t) {
+    return String(t || "")
+      .replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); })
+      .replace(/[\s,，。.、!！?？]/g, "")
+      .replace(/[零〇○洞一幺么二两兩三四五六七八九十百]+/g, kvCnNum)
+      .toLowerCase();
+  }
+  var KV_GO = "(?:出餐|出参|出蚕|初餐|出单|出單|出菜|出货|出貨|出了|好了|完成|做好|ok|okay)";
+  function kvParse(t) {
+    var s = kvNorm(t);
+    if (/(撤销|撤銷|撤回|复原|復原|还原|還原|取消刚才|取消剛才|按错|按錯|弄错|弄錯)/.test(s)) return { undo: true };
+    if (/(再念|再说|再說|重念|重复|重複|再一次)/.test(s)) return { repeat: true };
+    var m = s.match(new RegExp("(\\d{1,3})(?:号|號|番|好)?(?:单|單|蛋|丹|的)?(?:可以|已经|已經)?" + KV_GO)) ||
+      s.match(new RegExp("(?:出餐|出单|出單)(?:第)?(\\d{1,3})"));
+    return m ? { no: Number(m[1]) } : null;
+  }
+  function kvHeard(t, msg) {
+    var h = $("#kv-heard"); if (h) h.textContent = kvTxt((t ? "听到：「" + t + "」" : "") + (msg ? (t ? " → " : "") + msg : ""));
+  }
+  function kvAct(t) {
+    var c = kvParse(t);
+    if (!c) { kvHeard(t, "（不是指令，没动作）"); return; }
+    if (c.undo) {
+      if (!lastDoneId) { kvHeard(t, "没有可以撤销的"); kvSay("没有可以撤销的单"); return; }
+      undoDone();
+      kvHeard(t, "已撤销上一张");
+      kvSay("已撤销，单子放回待做");
+      return;
+    }
+    if (c.repeat) { kvHeard(t, "再念一次"); if (kvLast) kvSay(kvLast); else kvSay("目前没有新单"); return; }
+    var hit = orders.filter(function (o) { return Number(o.shown || o.no) === c.no; });
+    if (!hit.length) { kvHeard(t, "待做里没有 " + c.no + " 号"); kvSay("待做里没有 " + c.no + " 号"); return; }
+    if (canWrite === false || !db) { kvHeard(t, "这台设备不能出餐"); kvSay("这台设备不能出餐"); return; }
+    hit.sort(function (a, b) { return a.createdAt - b.createdAt; });
+    markDone(hit[0].id, { unpaid: true });
+    kvHeard(t, "#" + dno(hit[0]) + " 已出餐（前面收款）");
+    kvSay(c.no + " 号出餐");
+  }
+  function kvStripUi(state, cls) {
+    var st = $("#kv-strip"); if (!st) return;
+    st.hidden = !kvHf;
+    st.className = "kv-strip" + (cls ? " " + cls : "");
+    $("#kv-state").textContent = kvTxt(state);
+  }
+  function kvShouldListen() { return kvHf && currentView === "kitchen" && !document.hidden && $("#voice").hidden && !kvSpeaking; }
+  function kvPause() { if (kvRec && kvRecOn) { try { kvRec.abort(); } catch (e) {} } }
+  function kvSchedule(ms) { clearTimeout(kvRestartT); kvRestartT = setTimeout(kvStart, ms); }
+  function kvStart() {
+    clearTimeout(kvRestartT);
+    if (!kvHf) return;
+    if (!kvShouldListen()) {
+      if (kvHf && currentView === "kitchen") kvStripUi(kvSpeaking ? "正在播报，播完继续听…" : "暂停收音", "pause");
+      if (kvHf && currentView === "kitchen" && !document.hidden) kvSchedule(1500);
+      return;
+    }
+    if (kvRecOn) return;
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { kvStripUi("这个浏览器不能语音辨识（请用 Android 的 Chrome）", "bad"); return; }
+    var r;
+    try { r = kvRec = new SR(); } catch (e) { kvStripUi("无法使用麦克风", "bad"); return; }
+    r.lang = kvCode(); r.continuous = true; r.interimResults = false; r.maxAlternatives = 3;
+    r.onresult = function (e) {
+      for (var k = e.resultIndex; k < e.results.length; k++) {
+        if (!e.results[k].isFinal) continue;
+        var alts = e.results[k], pickT = alts[0].transcript;
+        for (var a = 0; a < alts.length; a++) { if (kvParse(alts[a].transcript)) { pickT = alts[a].transcript; break; } }
+        kvAct(pickT.trim());
+      }
+    };
+    r.onerror = function (e) {
+      var er = e && e.error;
+      if (er === "not-allowed" || er === "service-not-allowed") { kvHf = false; kvSave(); kvLabels(); kvStripUi("没有麦克风权限，已关闭喊号出餐", "bad"); $("#kv-strip").hidden = false; showToast("没有麦克风权限，请允许使用麦克风后再打开「喊号出餐」", false, true, 6000); }
+      else if (er === "network") kvStripUi("语音辨识需要网络，正在重试…", "bad");
+      else if (er === "audio-capture") kvStripUi("找不到麦克风", "bad");
+    };
+    r.onend = function () {
+      kvRecOn = false;
+      if (!kvHf) return;
+      kvQuick = Date.now() - kvStartAt < 1500 ? kvQuick + 1 : 0;
+      kvSchedule(kvQuick > 4 ? 3000 : 250);
+    };
+    try { r.start(); kvRecOn = true; kvStartAt = Date.now(); kvStripUi("正在听：说「12 号出餐」就会出餐；说「撤销」复原；说「再念一次」重听", "live"); }
+    catch (e) { kvRecOn = false; kvSchedule(1500); }
+  }
+  function kvStop() { clearTimeout(kvRestartT); kvPause(); kvRecOn = false; }
+  function kvSave() { try { localStorage.setItem("xlb-kv", JSON.stringify({ tts: kvTts, hf: kvHf })); } catch (e) {} }
+  function kvLabels() {
+    var a = $("#kv-tts"), b = $("#kv-hf");
+    if (a) { a.textContent = kvTxt("🔊 语音播报新单：" + (kvTts ? "开" : "关")); a.classList.toggle("kv-on", kvTts); }
+    if (b) { b.textContent = kvTxt("🎙 喊号出餐：" + (kvHf ? "开" : "关")); b.classList.toggle("kv-on", kvHf); }
+    if (!kvHf) { var st = $("#kv-strip"); if (st && !st.classList.contains("bad")) st.hidden = true; }
+  }
+  /* 浏览器要求先碰一下画面才肯出声：开着播报重新打开页面时，第一次点画面就解锁 */
+  function kvUnlock() {
+    if (kvUnlocked || !window.speechSynthesis || !window.SpeechSynthesisUtterance) return;
+    kvUnlocked = true;
+    try { var u = new SpeechSynthesisUtterance(" "); u.volume = 0; window.speechSynthesis.speak(u); } catch (e) {}
+  }
+  function kvToggle(which) {
+    if (which === "tts") {
+      if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) { showToast("这个浏览器不支持语音播报", false, true, 3000); return; }
+      kvTts = !kvTts; kvUnlock();
+      try { window.speechSynthesis.cancel(); } catch (e) {}
+      kvSave(); kvLabels();
+      if (kvTts) kvSay("语音播报已开启，有新单会念出来");
+    } else {
+      if (!(window.SpeechRecognition || window.webkitSpeechRecognition)) { showToast("这个浏览器不能语音辨识，请用 Android 的 Chrome 打开", false, true, 5000); return; }
+      kvHf = !kvHf; kvSave(); kvLabels();
+      if (kvHf) {
+        if (!kvTts) { kvTts = true; kvUnlock(); kvSave(); kvLabels(); }
+        kvStart();
+        kvSay("喊号出餐已开启。说，几号出餐");
+        if (typeof MODE_CLAUDE !== "undefined" && MODE_CLAUDE) showToast("Claude 里的画面可能不允许用麦克风；听不到的话请用网页版", false, true, 6000);
+      } else { kvStop(); $("#kv-strip").hidden = true; }
+    }
+  }
+  function kvInit() {
+    try { var c = JSON.parse(localStorage.getItem("xlb-kv") || "{}"); kvTts = !!c.tts; kvHf = !!c.hf; } catch (e) {}
+    kvLabels();
+    try { if (window.speechSynthesis) { window.speechSynthesis.getVoices(); window.speechSynthesis.onvoiceschanged = function () {}; } } catch (e) {}
+    document.addEventListener("click", function (e) {
+      var t = e.target && e.target.closest ? e.target.closest("[data-kv]") : null;
+      if (t) kvToggle(t.getAttribute("data-kv"));
+    });
+    document.addEventListener("pointerdown", function () { if (kvTts) kvUnlock(); if (kvHf && !kvRecOn) kvSchedule(50); }, true);
+    /* 打开语音点单时先让出麦克风 */
+    document.addEventListener("click", function (e) { var t = e.target && e.target.closest ? e.target.closest('[data-act="voice-open"]') : null; if (t) kvPause(); }, true);
+    var watch = function () { if (currentView === "kitchen" && kvHf) kvSchedule(300); else if (kvHf) kvStop(); };
+    window.addEventListener("hashchange", function () { setTimeout(watch, 50); });
+    document.addEventListener("visibilitychange", watch);
+    document.addEventListener("change", function (e) { var el = e.target; if (el && el.classList && el.classList.contains("langsel")) setTimeout(function () { kvLabels(); if (kvRecOn) kvPause(); }, 0); });
+    setTimeout(watch, 800);
+  }
+
   initCur();
   initLang();
   keepInit();
   xInit();
+  kvInit();
   qInit();
   netInit();
   try { if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol) && !MODE_CLAUDE && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") navigator.serviceWorker.register("sw.js").catch(function () {}); } catch (e) {}
